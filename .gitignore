@@ -3,6 +3,9 @@
 Thumbs.db
 .vscode/
 .idea/
+.cursor/
+.workbuddy
+.claude/
 
 # Python
 __pycache__/
@@ -29,10 +32,10 @@ cmake-build-*/
 *.log
 *.tmp
 
-# 数据集（仅限非商业研究用途，不纳入版本管理）
+# 数据集
 data/input/CelebAMask-HQ/
 data/input/subset/
 
-# 大作业中间输出（如需留痕可移除本行）
+# 大作业中间输出
 # data/output/*
 # results/*
