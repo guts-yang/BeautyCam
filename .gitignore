@@ -1,0 +1,38 @@
+# OS / Editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# MATLAB
+*.asv
+*.mex*
+slprj/
+
+# C/C++
+*.o
+*.obj
+*.exe
+*.out
+build/
+cmake-build-*/
+
+# 编译产物 / 临时结果
+*.log
+*.tmp
+
+# 数据集（仅限非商业研究用途，不纳入版本管理）
+course_project/data/input/CelebAMask-HQ/
+course_project/data/input/subset/
+
+# 大作业中间输出（如需留痕可移除本行）
+# course_project/data/output/*
+# course_project/results/*
