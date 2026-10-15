@@ -35,7 +35,7 @@ BeautyCam/
 │   ├── 选题审核报告-人脸美颜.md  # 选题讨论报告（组内传阅）
 │   ├── 设计方案-人脸美颜.md      # 设计方案（模块划分、分工、结果产出）
 │   ├── 架构设计与任务分工规划.md  # 架构设计与任务拆分（工作分解）
-│   └── issue规划.md             # GitHub Issue 规划（Epic/Issue 拆分与解耦设计）
+│   └── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
 ├── assets/
 │   └── test-images/            # 课程统一提供的标准测试图集（50 张）
 ├── src/                        # 源码（主流程与各处理模块）
