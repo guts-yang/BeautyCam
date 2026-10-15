@@ -51,9 +51,9 @@ flowchart LR
 
 | 板块 | 负责人 | 覆盖需求 | 独占目录与文件 |
 | --- | --- | --- | --- |
-| 一 平台与编排 | A | R8、R9、R10、R11、R12 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`src/prepare_data.py`、`config/pipeline.yaml`、`tests/integration/`、`.github/`、`requirements.txt`、`pytest.ini`、`.streamlit/config.toml`、`.gitignore` |
-| 二 检测与增强 | B | R1、R1.1、R1.2、R2、R2.1、R2.2、R2.3、R3、R3.1、R3.2、R4 | `src/beauty/modules/{skin_detect,exposure,smooth,freq_enhance}.py`、`config/{skin_detect,exposure,smooth,freq_enhance}.yaml`、`tests/unit/test_{skin_detect,exposure,smooth,freq_enhance}.py` |
-| 三 复原与评价 | C | R5、R6、R7、R7.1、R7.2、R13 | `src/beauty/modules/{restore,color}.py`、`src/beauty/metrics/metrics.py`、`config/{restore,color,metrics}.yaml`、`tests/unit/test_{restore,color,metrics}.py` |
+| 一 平台与编排 | A（队长，GitHub `guts-yang`） | R8、R9、R10、R11、R12 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`src/prepare_data.py`、`config/pipeline.yaml`、`tests/integration/`、`.github/`、`requirements.txt`、`pytest.ini`、`.streamlit/config.toml`、`.gitignore` |
+| 二 检测与增强 | B（GitHub `qixing1227`） | R1、R1.1、R1.2、R2、R2.1、R2.2、R2.3、R3、R3.1、R3.2、R4 | `src/beauty/modules/{skin_detect,exposure,smooth,freq_enhance}.py`、`config/{skin_detect,exposure,smooth,freq_enhance}.yaml`、`tests/unit/test_{skin_detect,exposure,smooth,freq_enhance}.py` |
+| 三 复原与评价 | C（待认领） | R5、R6、R7、R7.1、R7.2、R13 | `src/beauty/modules/{restore,color}.py`、`src/beauty/metrics/metrics.py`、`config/{restore,color,metrics}.yaml`、`tests/unit/test_{restore,color,metrics}.py` |
 
 ### 3.2 关键解耦点
 
@@ -222,9 +222,9 @@ g --> d2
 
 | 成员 | 独占 Issue | 独占文件/目录 | 对外契约 |
 | --- | --- | --- | --- |
-| A | I-01~I-08、I-24 的平台分块、I-27 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`config/pipeline.yaml`、CI | 提供三重契约与编排入口 |
-| B | I-09~I-16、I-24 的增强分块 | `modules/{skin_detect,exposure,smooth,freq_enhance}.py` + 对应 YAML | 只消费 image/mask 契约，不产出跨模块状态 |
-| C | I-17~I-23、I-24 的评价分块 | `modules/{restore,color}.py`、`metrics/metrics.py` + 对应 YAML | M7 只做纯计算，落盘交给 A 的 `io` |
+| A（GitHub `guts-yang`） | I-01~I-08、I-24 的平台分块、I-27 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`config/pipeline.yaml`、CI | 提供三重契约与编排入口 |
+| B（GitHub `qixing1227`） | I-09~I-16、I-24 的增强分块 | `modules/{skin_detect,exposure,smooth,freq_enhance}.py` + 对应 YAML | 只消费 image/mask 契约，不产出跨模块状态 |
+| C（待认领） | I-17~I-23、I-24 的评价分块 | `modules/{restore,color}.py`、`metrics/metrics.py` + 对应 YAML | M7 只做纯计算，落盘交给 A 的 `io` |
 
 负载估算（人日）：
 
@@ -268,7 +268,7 @@ g --> d2
 
 ### 9.4 分支与 PR 规则
 
-- 每人一条长期分支，分支名为本人名称简称（A 用 `lcy`，B/C 各用自己的简称）：`git checkout main && git pull && git checkout -b <简称>`。
+- 每人一条长期分支，分支名为本人名称简称（A `guts-yang` 用 `lcy`，B `qixing1227` 用 `qx`，C 待定用自己的简称）：`git checkout main && git pull && git checkout -b <简称>`。
 - 一次开发完成一个 Issue 后，`git push -u origin <简称>` 并发 PR 到 `main`；PR 描述用 `Closes #xx` 关联对应 Issue。
 - PR 由 A（GitHub `guts-yang`）统一 review 合并；必须通过对应模块单测与 CI 才能合入。
 - 模块 PR 不得夹带 `core/`、`io/`、`pipeline.yaml`、`requirements.txt`、`.github/` 改动。
