@@ -268,7 +268,7 @@ g --> d2
 
 ### 9.4 分支与 PR 规则
 
-- 每人一条长期分支，分支名为本人名称简称（A `guts-yang` 用 `lcy`，B `qixing1227` 用 `qx`，C `Shiqi0502` 用 `sq`）：`git checkout main && git pull && git checkout -b <简称>`。
+- 每人一条长期分支，分支名为本人名称简称（A `guts-yang` 用 `lcy`，B `qixing1227` 用 `lht`，C `Shiqi0502` 用 `lsq`）：`git checkout main && git pull && git checkout -b <简称>`。
 - 一次开发完成一个 Issue 后，`git push -u origin <简称>` 并发 PR 到 `main`；PR 描述用 `Closes #xx` 关联对应 Issue。
 - PR 由 A（GitHub `guts-yang`）统一 review 合并；必须通过对应模块单测与 CI 才能合入。
 - 模块 PR 不得夹带 `core/`、`io/`、`pipeline.yaml`、`requirements.txt`、`.github/` 改动。
