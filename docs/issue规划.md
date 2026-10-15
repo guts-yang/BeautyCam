@@ -268,9 +268,10 @@ g --> d2
 
 ### 9.4 分支与 PR 规则
 
-- 一个 Issue 一个分支：`feat/I-xx-简述`。
-- PR 描述用 `Closes #xx` 关联对应 Issue。
-- PR 必须通过对应模块单测与 CI 才能合入；模块 PR 不得夹带 `core/`、`io/`、`pipeline.yaml` 改动。
+- 每人一条长期分支，分支名为本人名称简称（A 用 `lcy`，B/C 各用自己的简称）：`git checkout main && git pull && git checkout -b <简称>`。
+- 一次开发完成一个 Issue 后，`git push -u origin <简称>` 并发 PR 到 `main`；PR 描述用 `Closes #xx` 关联对应 Issue。
+- PR 由 A（GitHub `guts-yang`）统一 review 合并；必须通过对应模块单测与 CI 才能合入。
+- 模块 PR 不得夹带 `core/`、`io/`、`pipeline.yaml`、`requirements.txt`、`.github/` 改动。
 - 禁止跨 Issue 打包提交。
 - 依赖关系用 GitHub 的 `blocked by` 显式标注。
 
