@@ -1,7 +1,7 @@
 # arch.md —— 架构约束基线（焕颜相机 BeautyCam）
 
-> 状态：**草稿（待确认）**。接口及目录方案均为拟定内容；用户明确“基线确认”后才生效。
-> 版本：v0.4 ｜ 适用项目：焕颜相机 BeautyCam（《数字图像处理》课程设计，2026）
+> 状态：**已确认（v1.0 基线锁定）**。接口及目录方案已冻结。
+> 版本：v1.0 ｜ 适用项目：焕颜相机 BeautyCam（《数字图像处理》课程设计，2026）
 > 文档语言：中文
 > 关联基线：[prd.md](./prd.md)、[design.md](./design.md)
 
@@ -28,7 +28,7 @@
 
 所有直接依赖最终均须在 `requirements.txt` 写为 `package==version`。具体版本号须在干净 venv 试装、CLI/UI 启动和测试通过后锁定；不得猜版本或在未验证环境下宣称可安装。
 
-## 3. 项目结构（拟定）
+## 3. 项目结构（v1.0 冻结）
 
 ```text
 BeautyCam/
@@ -54,8 +54,8 @@ BeautyCam/
 │       │   └── writer.py               # 图像、CSV 和结果持久化
 │       ├── modules/
 │       │   ├── __init__.py
-│       │   ├── skin_detect.py          # M1 (A)
-│       │   ├── exposure.py             # M2 (A)
+│       │   ├── skin_detect.py          # M1 (B)
+│       │   ├── exposure.py             # M2 (B)
 │       │   ├── smooth.py                # M3 (B)
 │       │   ├── freq_enhance.py         # M4 (B)
 │       │   ├── restore.py               # M5 (C)
@@ -68,8 +68,8 @@ BeautyCam/
 │   └── integration/                     # 本地真实数据集评测
 ├── config/
 │   ├── pipeline.yaml                    # 顺序、阶段开关、路径和运行模式（A）
-│   ├── skin_detect.yaml                 # M1 参数（A）
-│   ├── exposure.yaml                    # M2 参数（A）
+│   ├── skin_detect.yaml                 # M1 参数（B）
+│   ├── exposure.yaml                    # M2 参数（B）
 │   ├── smooth.yaml                      # M3 参数（B）
 │   ├── freq_enhance.yaml                # M4 参数（B）
 │   ├── restore.yaml                     # M5 参数（C）
@@ -118,8 +118,8 @@ modules M1–M6  metrics M7  io
 
 | 责任域 | 源码/配置 | owner 与写入边界 |
 | --- | --- | --- |
-| M1 肤色检测 | `modules/skin_detect.py`、`config/skin_detect.yaml` | A 独占 |
-| M2 曝光改善 | `modules/exposure.py`、`config/exposure.yaml` | A 独占 |
+| M1 肤色检测 | `modules/skin_detect.py`、`config/skin_detect.yaml` | B 独占 |
+| M2 曝光改善 | `modules/exposure.py`、`config/exposure.yaml` | B 独占 |
 | M3 空间域平滑 | `modules/smooth.py`、`config/smooth.yaml` | B 独占 |
 | M4 频域增强 | `modules/freq_enhance.py`、`config/freq_enhance.yaml` | B 独占 |
 | M5 运动模糊复原 | `modules/restore.py`、`config/restore.yaml` | C 独占 |
@@ -132,7 +132,7 @@ modules M1–M6  metrics M7  io
 
 模块配置文件让各 owner 可以独立开发。模块参数 schema 在并行开发前共同评审；模块 owner 只修改自己的配置文件。改公共接口、`pipeline.yaml`、评测协议或依赖集合时先提变更 Issue，评审后由 A 合并，避免共享文件冲突。
 
-## 5. 接口与数据契约（拟定）
+## 5. 接口与数据契约（v1.0 冻结）
 
 ### 5.1 按职责定义接口
 
@@ -270,14 +270,16 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 - 提交源码和课程允许提交的文档/结果；不提交可执行二进制、数据集、派生图像或含个人身份信息的问卷原始数据。
 - 数据仅用于课程教学/研究，遵守数据集许可，不二次分发。
 
-## 10. 待确认项
+## 10. 基线确认结论（v1.0）
 
-- [ ] OpenCV 是否采用 headless 发行包（本项目不使用 `cv2.imshow`，推荐采用）？
-- [ ] Python 3.10.x 是否作为统一本地与 CI 版本？
-- [ ] 所有直接依赖精确 pin，并在干净环境试装后补入具体版本，是否认可？
-- [ ] 分层目录与按模块独立 YAML 配置是否认可？
-- [ ] M5 默认关闭、合成模糊评测显式启用是否认可？
-- [ ] M1/M5/M7 差异化接口及模块纯计算约束是否认可？
-- [ ] 运行目录、CSV 长表字段与 12 位配置摘要是否认可？
-- [ ] 课程“可执行程序”按可运行 Python 源码解释是否需要向教师确认？
-- [ ] UI 上传图不自动持久化、结果仅在显式保存/导出时保留是否认可？
+以下条目已按预设值锁定为基线，开发中如需调整走 `change-request`。
+
+- [x] OpenCV 采用 `opencv-python-headless` 发行包。
+- [x] Python 3.10.x 作为统一本地与 CI 版本。
+- [x] 所有直接依赖精确 pin，具体版本在干净环境试装后补入。
+- [x] 分层目录与按模块独立 YAML 配置。
+- [x] M5 默认关闭，合成模糊评测时显式启用。
+- [x] M1/M5/M7 差异化接口及模块纯计算约束（按第 5 节）。
+- [x] 运行目录、CSV 长表字段与 12 位配置摘要（按第 7 节）。
+- [x] 课程“可执行程序”按可运行 Python 源码解释；若教师要求打包二进制再走变更。
+- [x] UI 上传图不自动持久化，结果仅在显式保存/导出时保留。

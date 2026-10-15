@@ -20,7 +20,9 @@
 
 阅读顺序建议：`prd.md` → `arch.md` → `design.md`。三者关系是"需求定义做什么、架构定义怎么搭、设计定义怎么做且什么禁止做"。
 
-三份文档当前均为**草稿（待确认）**，在用户明确"基线确认"前不得作为冻结契约使用。
+三份文档均已锁定为 v1.0 基线（已确认）。数值阈值按文档内预设值执行，开发中经实测确需调整时走 `change-request` 变更流程，不得单方面放宽。
+
+模块归属口径（三板块，与 `docs/issue规划.md` 一致）：A 负责流程编排与入口（`core/`、`io/`、CLI、UI）；B 负责 M1–M4（`skin_detect`、`exposure`、`smooth`、`freq_enhance`）；C 负责 M5–M7（`restore`、`color`、`metrics`）。
 
 ## 目录结构
 
