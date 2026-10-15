@@ -76,7 +76,7 @@ BeautyCam/
 │   ├── color.yaml                       # M6 参数（C）
 │   └── metrics.yaml                     # M7 参数/评测协议（C，协议变化须共同评审）
 ├── assets/
-│   ├── 实验图集/                         # 仓库现有课程测试图；新增图像须核对许可
+│   ├── test-images/                        # 仓库现有课程测试图；新增图像须核对许可
 │   ├── evaluation_manifest.csv           # 固定评测样本 ID/场景清单，不含图像像素
 │   └── blemish_roi_manifest.csv          # R2.3 若确认，记录匿名样本 ROI 坐标
 ├── data/
@@ -193,7 +193,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 - 固定评测集清单版本管理在 `assets/evaluation_manifest.csv`，至少记录 `sample_id,scene`；路径由数据根目录和 ID 依照固定规则构造，若写路径则只能是项目相对路径。清单不得包含机器绝对路径或图像像素。
 - 当前 `prepare_data.py` 按随机种子抽样，但枚举文件未先排序、没有分层抽样，也不生成 manifest。若基线确认 40 张固定/分层评测集，后续需通过独立 Issue 修订预处理脚本并人工核验清单；完成前不得声称已分层或完全可复现。
 - 若 R2.3 确认，`assets/blemish_roi_manifest.csv` 记录 `sample_id,x,y,width,height`；坐标以 1024×1024 原图左上角为原点的像素坐标，ROI 必须完全位于 skin GT 内。匿名评分记录单独保存于被忽略的本地评测产物中；ROI 清单不代替算法掩码，也不进入推理接口。
-- 仓库现有 `assets/实验图集/` 保留为课程测试素材；新增图像须核对许可。CelebAMask-HQ 原始图/掩码、派生子集、用户上传肖像和运行产物不得提交；CI 使用合成样例。
+- 仓库现有 `assets/test-images/` 保留为课程测试素材；新增图像须核对许可。CelebAMask-HQ 原始图/掩码、派生子集、用户上传肖像和运行产物不得提交；CI 使用合成样例。
 
 ## 6. 流水线与执行规则
 
