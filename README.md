@@ -1,7 +1,7 @@
 # 焕颜相机 BeautyCam —— 人脸美颜相机（数字图像处理课程设计，2026）
 
 <p align="center">
-  <img src="report/figures/canvas.png" alt="BeautyCam 项目总览" width="100%">
+  <img src="assets/canvas.png" alt="BeautyCam 项目总览" width="100%">
 </p>
 
 《数字图像处理》课程设计（大作业）项目代码、数据与文档仓库。
@@ -46,6 +46,7 @@ BeautyCam/
 │   ├── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
 │   └── 社群分享文案.md           # 组内分派用的社群文案（板块认领 + 提交规范）
 ├── assets/
+│   ├── canvas.png             # 项目总览封面图（README 顶部引用）
 │   ├── test-images/            # 课程统一提供的标准测试图集（50 张）
 │   └── evaluation_manifest.csv # 固定评测样本清单（sample_id,scene）
 ├── src/                        # 源码
