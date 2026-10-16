@@ -1,0 +1,11 @@
+# -*- coding: utf-8 -*-
+# restore.yaml —— M5 运动模糊复原参数（owner: C）
+# 验收基线：配对增量 PSNR ≥ +0.5 dB 且 SSIM ≥ +0.02；须记录 PSF/噪声/随机种子。
+
+# 维纳/逆滤波参数
+psf_length: 15
+psf_angle: 0.0
+noise_sigma: 0.01
+
+# 随机种子（评测可复现）
+seed: 42

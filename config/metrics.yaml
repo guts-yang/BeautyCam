@@ -1,0 +1,31 @@
+# -*- coding: utf-8 -*-
+# metrics.yaml —— M7 指标与评测协议参数（owner: C，协议变化须共同评审）
+# 数值为 v1.0 预设基线，试测后如需调整走 change-request。
+
+# 评测集
+manifest: assets/evaluation_manifest.csv
+expected_samples: 40
+scenes: [normal, backlight, lowlight, blemish, blur]
+
+# 指标阈值（验收基线）
+thresholds:
+  skin_iou: 0.75
+  skin_recall: 0.80
+  variance_drop_min: 0.20
+  variance_drop_max: 0.40
+  epi: 0.80
+  exposure_gain: 0.15
+  overexposure_ratio: 0.01
+  delta_e2000: 5.0
+  psnr_delta_db: 0.5
+  ssim_delta: 0.02
+  hf_ratio_min: 0.70
+  hf_ratio_max: 1.30
+
+# 评测协议常量（3.4 节）
+protocol:
+  skin_erode_kernel: 11
+  variance_window: 7
+  epsilon: 1.0e-6
+  hf_sigma: 3.0
+  border_type: BORDER_REFLECT_101

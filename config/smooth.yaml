@@ -1,0 +1,12 @@
+# -*- coding: utf-8 -*-
+# smooth.yaml —— M3 空间域平滑参数（owner: B）
+# 验收基线：皮肤局部方差下降率 20%–40%；五官 GT 区 EPI ≥ 0.80。
+
+# 保边滤波
+strength: 0.5
+bilateral_d: 9
+sigma_color: 75
+sigma_space: 75
+
+# 边界处理（评测协议固定）
+border_type: BORDER_REFLECT_101

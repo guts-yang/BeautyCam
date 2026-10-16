@@ -1,0 +1,16 @@
+# -*- coding: utf-8 -*-
+# skin_detect.yaml —— M1 肤色检测参数（owner: B）
+# 数值为 v1.0 预设基线，试测后如需调整走 change-request。
+
+# 色彩空间判定阈值（YCrCb 经验区间，供实现参考）
+ycbcr:
+  cr_min: 133
+  cr_max: 173
+  cb_min: 77
+  cb_max: 127
+
+# 掩码后处理
+postprocess:
+  enabled: true
+  morph_kernel: 5
+  min_area_ratio: 0.001
