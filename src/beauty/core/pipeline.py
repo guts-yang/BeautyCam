@@ -154,8 +154,10 @@ def _persist(result: PipelineResult, final_bgr: np.ndarray,
             write_image(os.path.join(output_root, "data", "output", result.run_id,
                                      "samples", sample, "diagnostics", "frequency",
                                      f"{name}.png"), img)
-    if result.mode == "evaluation" and result.metrics:
-        rows = _metrics_to_rows(result)
+    if result.mode == "evaluation":
+        # 评测模式必须产出 metrics.csv：即便本轮指标为空，也写出固定表头，
+        # 保证 results/<run_id>/metrics.csv 的存在性与字段顺序稳定可断言（对齐 arch 7.3）。
+        rows = _metrics_to_rows(result) if result.metrics else []
         write_metrics_csv(os.path.join(output_root, "results", result.run_id, "metrics.csv"), rows)
 
 
