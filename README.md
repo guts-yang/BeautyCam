@@ -22,6 +22,8 @@
 
 三份文档均已锁定为 v1.0 基线（已确认）。数值阈值按文档内预设值执行，开发中经实测确需调整时走 `change-request` 变更流程，不得单方面放宽。
 
+数据获取顶层约束（不可违反）：所有数据集相关脚本（下载、解压、预处理、抽样）一律只获取工作所需的最小样本子集，禁止下载完整数据集或做全量抽取。本课题不训练深度模型，只需 20~50 张，因此任何数据脚本都不得拉取整包或遍历全量。CelebAMask-HQ 官方 zip 为 3.15GB、解压后约 30GB，`src/prepare_data.py fetch` 以 HTTP Range 按需抽取（实测 40 张约 66MB）；新增数据脚本须遵循同一约束。个别样本缺标注只会跳过，不得因此改为全量拉取。确需全量数据时须走 `change-request` 评审。
+
 模块归属口径（三板块，与 `docs/issue规划.md` 一致）：A（GitHub `guts-yang`）负责流程编排与入口（`core/`、`io/`、CLI、UI）；B（GitHub `qixing1227`）负责 M1–M4（`skin_detect`、`exposure`、`smooth`、`freq_enhance`）；C（GitHub `Shiqi0502`）负责 M5–M7（`restore`、`color`、`metrics`）。
 
 ## 目录结构
@@ -152,12 +154,17 @@ python src/prepare_data.py fetch --out data/input/subset --num 40 \
     --manifest assets/evaluation_manifest.csv
 ```
 
-如果已自行下载完整数据集（授权仅限非商业研究，须自行获取），则走本地路径：先合并分散掩码，再抽取子集，输出原图、合并掩码、皮肤掩码三份内容。`fetch` 与 `subset` 的抽样规则一致（排序 + 固定种子 42），同一数据集下产出的 `sample_id` 相同，可互相校验。
+如果已自行具备完整数据集（授权仅限非商业研究，须自行获取），则走本地路径 `subset`：它先按固定种子抽样，再只合并抽中样本的掩码，不对全量 30000 张做扫描或合并。`fetch` 与 `subset` 的抽样规则一致（排序 + 固定种子 42），同一数据集下产出的 `sample_id` 相同，可互相校验。
 
 ```bash
-python src/prepare_data.py merge  --root data/input/CelebAMask-HQ
 python src/prepare_data.py subset --root data/input/CelebAMask-HQ \
     --out data/input/subset --num 40 --manifest assets/evaluation_manifest.csv
+```
+
+若只想单独合并少量指定样本的掩码（例如排查某个样本），用 `merge` 并显式给出 ID，避免全量扫描：
+
+```bash
+python src/prepare_data.py merge --root data/input/CelebAMask-HQ --ids 10507,11300
 ```
 
 输出结构为 `images/`（1024×1024 原图）、`masks/`（512×512 合并索引掩码，索引 1 为皮肤）、`skin_masks/`（皮肤二值掩码，uint8 0/255）。个别样本在官方数据集中缺皮肤标注，`fetch` 会自动跳过，保证 GT 完整。

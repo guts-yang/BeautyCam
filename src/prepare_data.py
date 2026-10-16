@@ -2,18 +2,20 @@
 # -*- coding: utf-8 -*-
 """CelebAMask-HQ 数据预处理：远程按需抽取 / 合并掩码 / 生成固定评测清单。
 
-课设不训练深度模型，无需全量数据，因此默认走「远程按需抽取」：只拉取
-评测所需的那几十张，不下载 3GB 整包。
+顶层约束（不可违反，见 README「项目约束基线」与 docs/baseline/arch.md 5.2）：
+所有数据集脚本一律只获取工作所需的最小样本子集，禁止下载完整数据集或做全量抽取。
+本课题不训练深度模型，工作子集为 20~50 张，默认走「远程按需抽取」：只拉取
+评测所需的那几十张，不下载 3GB 整包。个别样本缺标注时按跳过处理，不得因此改为全量拉取。
 
 用法示例：
-    # 1)（推荐）从公开镜像按 HTTP Range 抽取少量样本，不下载整包
+    # 1)（推荐，默认路径）从公开镜像按 HTTP Range 抽取少量样本，不下载整包
     python src/prepare_data.py fetch --num 40 --out data/input/subset \
         --manifest assets/evaluation_manifest.csv
 
-    # 2)（可选）已自行下载整包时，合并全部 30000 张分散掩码
+    # 2)（仅当本地已自行具备整包时）合并分散掩码
     python src/prepare_data.py merge --root data/input/CelebAMask-HQ
 
-    # 3)（可选）从本地整包抽取子集
+    # 3)（仅当本地已自行具备整包时）从本地抽取子集
     python src/prepare_data.py subset --root data/input/CelebAMask-HQ \
         --out data/input/subset --num 40 --manifest assets/evaluation_manifest.csv
 
@@ -64,13 +66,18 @@ class DataError(RuntimeError):
 
 # --- 合并分散掩码（本地整包场景） -----------------------------------------
 
-def merge_masks(root, img_num=30000, save_dir=None):
-    """把 CelebAMask-HQ-mask-anno 下分散的组件 png 合并成单张索引掩码。"""
+def merge_masks(root, ids, save_dir=None):
+    """把 CelebAMask-HQ-mask-anno 下分散的组件 png 合并成单张索引掩码。
+
+    顶层约束要求只处理工作所需的最小样本，因此本函数只合并显式传入的 `ids`，
+    不做全量扫描。若确实需要整包，请自行决定并明确传入全部 ID。
+    """
     src = os.path.join(root, "CelebAMask-HQ-mask-anno")
     save_dir = save_dir or os.path.join(root, "CelebAMask-HQ-mask")
     os.makedirs(save_dir, exist_ok=True)
 
-    for k in range(img_num):
+    ids = sorted(ids)
+    for done, k in enumerate(ids, 1):
         folder_num = k // 2000  # 每 2000 张一个子目录
         merged = np.zeros((512, 512), dtype=np.uint8)
         for idx, label in enumerate(LABEL_LIST):
@@ -82,9 +89,9 @@ def merge_masks(root, img_num=30000, save_dir=None):
                 continue
             merged[comp != 0] = idx + 1
         cv2.imwrite(os.path.join(save_dir, f"{k}.png"), merged)
-        if (k + 1) % 1000 == 0:
-            print(f"[merge] {k + 1}/{img_num}")
-    print(f"[merge] 完成，输出目录：{save_dir}")
+        if done % 100 == 0:
+            print(f"[merge] {done}/{len(ids)}")
+    print(f"[merge] 完成 {len(ids)} 张，输出目录：{save_dir}")
 
 def _list_dataset_ids(img_dir):
     """枚举数据集图片 ID，先排序再返回，保证可复现（不依赖 readdir 顺序）。"""
@@ -144,11 +151,14 @@ def _emit_sample(sample_id, image_bgr, merged_mask, out_img, out_mask, out_skin)
     return skin
 
 def build_subset(root, out, num=40, seed=42, manifest_path=None, scenes=None):
-    """从本地整包抽取子集，输出原图、合并掩码、皮肤掩码与固定评测清单。"""
+    """从本地整包目录抽取子集，输出原图、合并掩码、皮肤掩码与固定评测清单。
+
+    顶层约束：只处理抽中的样本，不对全量 30000 张做扫描或合并。
+    """
     img_dir = os.path.join(root, "CelebA-HQ-img")
-    mask_dir = os.path.join(root, "CelebAMask-HQ-mask")
-    if not os.path.isdir(mask_dir):
-        raise DataError(f"未找到合并掩码目录 {mask_dir}，请先执行 merge 子命令，"
+    anno_dir = os.path.join(root, "CelebAMask-HQ-mask-anno")
+    if not os.path.isdir(anno_dir):
+        raise DataError(f"未找到标注目录 {anno_dir}，"
                         f"或改用 fetch 子命令从远程按需抽取。")
 
     # 关键：先排序再固定种子抽样，避免枚举顺序导致不可复现。
@@ -164,14 +174,23 @@ def build_subset(root, out, num=40, seed=42, manifest_path=None, scenes=None):
     written = []
     for k in ids:
         src_img = os.path.join(img_dir, f"{k}.jpg")
-        src_mask = os.path.join(mask_dir, f"{k}.png")
-        if not (os.path.exists(src_img) and os.path.exists(src_mask)):
+        if not os.path.exists(src_img):
             continue
         arr = cv2.imread(src_img, cv2.IMREAD_COLOR)
-        mask = cv2.imread(src_mask, cv2.IMREAD_GRAYSCALE)
-        if arr is None or mask is None:
+        if arr is None:
             continue
-        _emit_sample(k, arr, mask, out_img, out_mask, out_skin)
+        # 只合并这一张的组件，不全量扫描。
+        folder = k // 2000
+        comps = {}
+        for label in LABEL_LIST:
+            fname = os.path.join(anno_dir, str(folder), f"{k:05d}_{label}.png")
+            if not os.path.exists(fname):
+                continue
+            comp = cv2.imread(fname, cv2.IMREAD_GRAYSCALE)
+            if comp is not None:
+                comps[label] = comp
+        merged = _merge_components(comps)
+        _emit_sample(k, arr, merged, out_img, out_mask, out_skin)
         written.append(k)
 
     _write_manifest(written, manifest_path)
@@ -249,11 +268,12 @@ def _resolve_zip(url):
         return resp.geturl(), int(resp.headers["Content-Length"])
 
 def fetch_subset(out, num=40, seed=42, manifest_path=None, zip_url=None,
-                 img_num=30000):
+                 pool=30000):
     """从远程 zip 按需抽取子集，只拉取需要的样本字节。
 
     抽样规则与 build_subset 完全一致（排序 + 固定种子），因此两者在同一数据集下
-    产出的 sample_id 相同，可互相校验。
+    产出的 sample_id 相同，可互相校验。`pool` 只是候选 ID 池，用于抽样，
+    不会下载或处理全量数据。
     """
     zip_url = zip_url or DEFAULT_ZIP_URL
     final_url, size = _resolve_zip(zip_url)
@@ -267,7 +287,7 @@ def fetch_subset(out, num=40, seed=42, manifest_path=None, zip_url=None,
     names = set(zf.namelist())
     print(f"[fetch] 条目 {len(names)}，中央目录已读取 {rf.bytes_fetched/1e6:.1f}MB")
 
-    ids = list(range(img_num))
+    ids = list(range(pool))
     random.Random(seed).shuffle(ids)
 
     out_img = os.path.join(out, "images")
@@ -333,14 +353,16 @@ def main():
     p0.add_argument("--seed", type=int, default=42)
     p0.add_argument("--manifest", default="assets/evaluation_manifest.csv")
     p0.add_argument("--zip-url", default=None, help="覆盖默认的公开镜像地址")
-    p0.add_argument("--img-num", type=int, default=30000, help="数据集总张数")
+    p0.add_argument("--pool", type=int, default=30000,
+                    help="候选 ID 池大小（仅用于抽样，不下载/不处理全量）")
 
-    p1 = sub.add_parser("merge", help="合并分散掩码（本地整包）")
+    p1 = sub.add_parser("merge", help="合并指定样本的分散掩码（仅限已抽取的样本）")
     p1.add_argument("--root", required=True, help="CelebAMask-HQ 根目录")
-    p1.add_argument("--img-num", type=int, default=30000)
+    p1.add_argument("--ids", required=True,
+                    help="要合并的样本 ID，逗号分隔（如 10507,11300,12002）")
     p1.add_argument("--save-dir", default=None)
 
-    p2 = sub.add_parser("subset", help="抽取子集并生成评测清单（本地整包）")
+    p2 = sub.add_parser("subset", help="从本地目录抽取子集并生成评测清单")
     p2.add_argument("--root", required=True, help="CelebAMask-HQ 根目录")
     p2.add_argument("--out", required=True, help="子集输出目录")
     p2.add_argument("--num", type=int, default=40)
@@ -351,9 +373,10 @@ def main():
     args = ap.parse_args()
     if args.cmd == "fetch":
         fetch_subset(args.out, args.num, args.seed, args.manifest,
-                     args.zip_url, args.img_num)
+                     args.zip_url, args.pool)
     elif args.cmd == "merge":
-        merge_masks(args.root, args.img_num, args.save_dir)
+        ids = [int(x) for x in args.ids.split(",") if x.strip()]
+        merge_masks(args.root, ids, args.save_dir)
     else:
         build_subset(args.root, args.out, args.num, args.seed, args.manifest)
 
