@@ -30,7 +30,7 @@ CelebAMask-HQ 是 CelebA-HQ 的高质量人脸数据集，包含 30,000 张 1024
    ```
 2. 百度网盘：国内网络首选，从官方仓库 README 的 "Baidu Drive" 链接获取。
 
-完整数据集解压后约 30GB，需提前规划磁盘空间。
+完整数据集压缩包约 3.15GB（解压后因 40 万个分散标注小文件而膨胀到约 30GB）。**本课题不需要下载整包**：`src/prepare_data.py fetch` 会从公开镜像按 HTTP Range 按需抽取所需的几十张，实测 40 张仅约 66MB。
 
 ## 目录结构
 
@@ -76,6 +76,13 @@ CelebAMask-HQ/
 - 偏色/低曝光：验证白平衡与伽马校正；
 - 含眼镜/刘海遮挡：验证肤色检测的鲁棒性。
 
-用 `src/prepare_data.py` 从全量数据中抽取子集并合并掩码。
+用 `src/prepare_data.py` 抽取子集并合并掩码。推荐 `fetch` 子命令（从公开镜像按需抽取，不下载整包）：
+
+```bash
+python src/prepare_data.py fetch --out data/input/subset --num 40 \
+    --manifest assets/evaluation_manifest.csv
+```
+
+如已下载整包，则用 `merge` + `subset` 两个子命令。
 
 > 数据集的候选方案横向评估与二次筛选的完整记录，见根目录 `README.md` 的「数据集」章节。
