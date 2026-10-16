@@ -32,6 +32,11 @@ cmake-build-*/
 *.log
 *.tmp
 
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+
 # 数据集
 data/input/CelebAMask-HQ/
 data/input/subset/
