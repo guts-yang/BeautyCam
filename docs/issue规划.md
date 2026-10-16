@@ -4,11 +4,13 @@
 > 对应设计方案：[设计方案-人脸美颜.md](./设计方案-人脸美颜.md)
 > 系统名：焕颜相机（BeautyCam）｜题目：4. 人脸美颜相机——肤色保护与细节增强
 > 团队：3 人（A 为队长）｜技术栈：Python 3.10 + OpenCV + NumPy + Streamlit（纯传统方法）
-> 版本：v2.0（三板块重排）｜上一版：v1.0（8 Epic / 24 Issue）
+> 版本：v2.1（补充测试与回归门禁）｜上一版：v2.0（三板块重排）
 
 ---
 
 ## 1. 本版修订说明
+
+### 1.1 v2.0 相对 v1.0 的调整
 
 本版相对 v1.0 做三处实质调整，均以基线文档为准：
 
@@ -20,6 +22,18 @@
 
 V1.0 的 A 同时是「地基提供者 + M1 掩码生产者 + 集成者 + 答辩负责人」，形成单点瓶颈；B 仅 4 个 Issue、C 仅 6 个，负载比约 11:4:6。v2.0 改为垂直切片，负载比约 8:7.5:6.5。
 
+### 1.2 v2.1 相对 v2.0 的调整
+
+本次同步设计方案新增的第 6 章「测试与回归策略」，把回归提升为地基的一部分：
+
+| 调整 | v2.0 | v2.1 | 原因 |
+| --- | --- | --- | --- |
+| I-08 范围 | 集成测试与 CI | 集成测试 + 契约守卫 + 回归基线 + CI 多 job | 每次合并都需回归，测试是地基而非附属 |
+| 合并门禁 | 通过单测与 CI | 通过单测与 CI，且**每次合并必须跑回归** | 防止合并引入回归破坏既有功能 |
+| 回归基线 | 无 | 契约基线 + 数值基线 + 图像基线，变更走 `change-request` | 回归判定可量化、可追溯 |
+
+回归策略的完整定义见 [设计方案-人脸美颜.md](./设计方案-人脸美颜.md) 第 6 章，本节只同步到 Issue 粒度，避免两处口径漂移。
+
 ---
 
 ## 2. 规划目标与原则
@@ -30,6 +44,7 @@ Issue 规划的首要目标不是「把活儿列全」，而是让三人在契�
 2. **文件级私有**：一个目录/文件一个 owner，全仓无共享写入文件。
 3. **契约即唯一串行点**：接口签名、模块配置 schema、掩码与产物落盘规范冻结一次后不得随意变更；确需变更须开 `change-request` Issue（见 prd.md 第 7 节）。
 4. **集成显式立项**：联调不是「做完再说」，而是独立 Epic，占排期、有验收标准。
+5. **回归即地基**：测试与回归流水线在 E0/E1 阶段先行建立，每次合并到 `main` 都必须跑回归，确定契约不被破坏（详见设计方案第 6 章）。
 
 ---
 
@@ -107,7 +122,7 @@ def summarize_survey(responses, cfg) -> Mapping[str, Any]:
 | Epic | 名称 | 目标 | 负责人 | 覆盖需求 |
 | --- | --- | --- | --- | --- |
 | E0 | 平台地基与冻结契约 | 骨架 + 接口 + 配置 + 数据/掩码契约 + IO 与产物契约 | A | R8、R9 |
-| E1 | 主流程与演示 | pipeline 编排 + CLI/批处理 + Streamlit + 集成测试与 CI | A | R8、R10、R11、R12 |
+| E1 | 主流程与演示 | pipeline 编排 + CLI/批处理 + Streamlit + 测试与回归流水线 + CI | A | R8、R10、R11、R12 |
 | E2 | 检测与增强链 | M1/M2/M3/M4 | B | R1–R4 |
 | E3 | 复原·色彩·评价链 | M5/M6/M7 + 问卷汇总 | C | R5、R6、R7、R13 |
 | E4 | 全流程验收实验 | 模块隔离评测 + 端到端实验 + 参数表 | A+B+C（分块） | 全部 P0 |
@@ -123,14 +138,14 @@ def summarize_survey(responses, cfg) -> Mapping[str, Any]:
 
 | ID | 标题 | Epic | 标签 | 前置 | 验收标准 / 解耦点 |
 | --- | --- | --- | --- | --- | --- |
-| I-01 | 搭建 `src/beauty/` 包骨架与目录结构 | E0 | infra | - | 目录冻结对齐 arch.md 第 3 节；`python src/main.py --help` 可跑 |
+| I-01 | 搭建 `src/beauty/` 包骨架与目录结构 | E0 | infra | - | 目录冻结对齐 arch.md 第 3 节（含 `tests/unit/`、`tests/integration/`）；`python src/main.py --help` 可跑 |
 | I-02 | 冻结三重契约：模块接口 + 配置 schema + 掩码格式 | E0 | contract | I-01 | 7 模块签名一致并可 import；桩函数满足 shape/dtype 契约；掩码定为 uint8 0/255；**全组第一优先，硬闸门** |
 | I-03 | 数据子集与 GT 掩码产出（`prepare_data.py` + manifest） | E0 | contract,data | - | 生成 `images/`、`masks/`、`skin_masks/`；产出 `assets/evaluation_manifest.csv`（含 `sample_id,scene`，不含绝对路径与像素） |
 | I-04 | IO 层与产物落盘契约 | E0 | contract,infra | I-01 | `io/reader.py`、`io/writer.py` 就位；产物路径、`metrics.csv`/`failures.csv` 字段顺序固定（对齐 arch.md 7.3） |
 | I-05 | `core/pipeline.py` 流水线编排 | E1 | feature,pipeline | I-02,I-04 | 固定 M5→M1→M2→M3→M4→M6→M7 顺序；`pipeline.yaml` 阶段开关生效；M5 默认关闭 |
 | I-06 | CLI 单图与批处理 + 异常隔离 | E1 | feature,infra | I-05 | GWT 通过；失败项写 `results/<run_id>/failures.csv`，后续样本继续 |
 | I-07 | Streamlit 演示界面 | E1 | feature,ui | I-05 | GWT 通过；无 GT 时说明参考型指标不可评估；原图不自动持久化，须显式导出 |
-| I-08 | 集成测试与 CI（主流程/空掩码/批处理隔离） | E1 | test,infra | I-05,I-06 | GitHub Actions 在 3.10.x 执行 `pytest -m "not integration"`；空掩码不崩、不误处理整图 |
+| I-08 | 测试与回归流水线（单测/契约守卫/集成 + CI） | E1 | test,infra | I-05,I-06 | `pytest.ini` 固定 `testpaths=tests`、`pythonpath=src`、声明 `integration` marker；`tests/unit/test_contracts.py` 契约守卫覆盖 7 签名/掩码格式/CSV 字段顺序/config schema；`tests/integration/` 覆盖主流程/空掩码/批处理隔离；建立契约+数值+图像三类黄金基线；CI 分 `unit-regression`/`contract-guard`/`integration-regression` 三 job，在 3.10.x 执行 `pytest -m "not integration"`；空掩码不崩、不误处理整图；**每次合并必须跑回归，回归不通过不得合并**（对齐设计方案第 6 章） |
 
 ### 6.2 板块二 检测与增强（B）
 
@@ -222,7 +237,7 @@ g --> d2
 
 | 成员 | 独占 Issue | 独占文件/目录 | 对外契约 |
 | --- | --- | --- | --- |
-| A（GitHub `guts-yang`） | I-01~I-08、I-24 的平台分块、I-27 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`config/pipeline.yaml`、CI | 提供三重契约与编排入口 |
+| A（GitHub `guts-yang`） | I-01~I-08、I-24 的平台分块、I-27 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`config/pipeline.yaml`、`tests/integration/`、`tests/unit/test_contracts.py`、黄金基线快照、CI | 提供三重契约、编排入口与回归门禁 |
 | B（GitHub `qixing1227`） | I-09~I-16、I-24 的增强分块 | `modules/{skin_detect,exposure,smooth,freq_enhance}.py` + 对应 YAML | 只消费 image/mask 契约，不产出跨模块状态 |
 | C（GitHub `Shiqi0502`，已加入仓库并指派） | I-17~I-23、I-24 的评价分块 | `modules/{restore,color}.py`、`metrics/metrics.py` + 对应 YAML | M7 只做纯计算，落盘交给 A 的 `io` |
 
@@ -271,6 +286,7 @@ g --> d2
 - 每人一条长期分支，分支名为本人名称简称（A `guts-yang` 用 `lcy`，B `qixing1227` 用 `lht`，C `Shiqi0502` 用 `lsq`）：`git checkout main && git pull && git checkout -b <简称>`。
 - 一次开发完成一个 Issue 后，`git push -u origin <简称>` 并发 PR 到 `main`；PR 描述用 `Closes #xx` 关联对应 Issue。
 - PR 由 A（GitHub `guts-yang`）统一 review 合并；必须通过对应模块单测与 CI 才能合入。
+- **每次合并到 `main` 都必须跑回归**（快速回归 + 合并后全量回归），回归不通过不得合并；禁止用放宽阈值、跳过或删除用例规避（对齐设计方案第 6 章）。
 - 模块 PR 不得夹带 `core/`、`io/`、`pipeline.yaml`、`requirements.txt`、`.github/` 改动。
 - 禁止跨 Issue 打包提交。
 - 依赖关系用 GitHub 的 `blocked by` 显式标注。
@@ -283,3 +299,4 @@ g --> d2
 2. 再建 27 个 Issue，按第 6 节配置 label / 责任人 / milestone / blocked-by。
 3. 建立 Projects(v2) 看板，把 Issue 拖入对应列。
 4. 组内评审确认 `I-02` 契约内容后，立即开工 E0，冻结契约，解锁并行。
+5. E1 阶段同步落地测试与回归流水线（I-08）：契约守卫、集成测试、三类黄金基线与三 job CI，此后每次合并自动触发回归。
