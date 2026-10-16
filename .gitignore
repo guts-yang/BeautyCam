@@ -4,8 +4,11 @@ Thumbs.db
 .vscode/
 .idea/
 .cursor/
-.workbuddy
+.workbuddy/
+.codebuddy/
 .claude/
+.trae/
+.agent/
 
 # Python
 __pycache__/
