@@ -1,0 +1,11 @@
+# -*- coding: utf-8 -*-
+# color.yaml —— M6 色彩/白平衡参数（owner: C）
+# 验收基线：偏色输入皮肤区 ΔE2000 宏平均 ≤5；须记录 RGB 通道增益。
+
+# 白平衡
+temperature: 0.0
+wb_method: gray_world
+
+# 肤色区限定处理
+skin_only: true
+saturation_gain: 1.05

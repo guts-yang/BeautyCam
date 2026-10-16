@@ -1,0 +1,14 @@
+# Streamlit 主题映射（A 独占）
+# 只承载 UI 主题；算法参数不得放到 UI 配置（arch 第 3 节）。
+# 色值对齐 docs/baseline/design.md 2.1 节 Token。
+
+[theme]
+base = "light"
+primaryColor = "#E8A598"
+backgroundColor = "#FAF7F4"
+secondaryBackgroundColor = "#FFFFFF"
+textColor = "#2B2622"
+font = "sans serif"
+
+[server]
+headless = true

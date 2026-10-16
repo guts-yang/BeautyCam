@@ -1,0 +1,16 @@
+# -*- coding: utf-8 -*-
+# exposure.yaml —— M2 曝光改善参数（owner: B）
+# 验收基线：欠曝样本皮肤区平均 Y 相对提升 ≥15%，处理后 Y>250 比例 ≤1%。
+
+# 目标肤色亮度与提升上限
+target_y: 150
+gain: 0.3
+max_gain: 1.5
+
+# 过曝保护
+overexposure_y: 250
+overexposure_ratio_limit: 0.01
+
+# 曲线方式：gamma / linear
+method: gamma
+gamma: 1.0

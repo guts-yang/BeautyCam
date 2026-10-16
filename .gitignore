@@ -37,10 +37,16 @@ cmake-build-*/
 .env.*
 !.env.example
 
-# 数据集
+# 数据集（原始与派生，不提交）
 data/input/CelebAMask-HQ/
 data/input/subset/
+data/input/*/
 
-# 大作业中间输出
-# data/output/*
-# results/*
+# 运行产物与结果记录（arch 7.2）
+data/output/
+results/
+
+# 测试缓存
+.pytest_cache/
+.coverage
+htmlcov/

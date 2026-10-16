@@ -1,0 +1,40 @@
+# -*- coding: utf-8 -*-
+# pipeline.yaml —— 流水线固定顺序、阶段开关、运行模式与 I/O 选项（A 独占）
+# 顺序与开关为契约基线，不得由模块 owner 修改（arch 第 6 节）。
+
+# 固定执行顺序（仅作声明，实际顺序由 core/pipeline.py 保证）
+order:
+  - restore
+  - skin_detect
+  - exposure
+  - smooth
+  - freq_enhance
+  - color
+  - metrics
+
+# 阶段开关：完整课程 profile 中 M1/M2/M3/M4/M6 必须开启；M5 默认关闭。
+stages:
+  restore_enabled: false
+  skin_detect_enabled: true
+  exposure_enabled: true
+  smooth_enabled: true
+  freq_enhance_enabled: true
+  color_enabled: true
+
+# M4 频率诊断开关：普通 process 默认 false；evaluation 的 M4 隔离 profile 默认 true。
+diagnostics:
+  frequency_enabled: false
+
+# 运行模式默认值（可被 CLI/UI 覆盖）
+mode: process
+
+# 评测 profile：module_isolated 或 end_to_end
+evaluation:
+  profile: module_isolated
+  target_module: null
+
+# 路径（相对仓库根目录；禁止写入机器绝对路径）
+paths:
+  data_root: data/input
+  output_dir: data/output
+  results_dir: results
