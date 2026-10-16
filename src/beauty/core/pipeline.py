@@ -27,7 +27,7 @@ import numpy as np
 
 from beauty.core.config import compute_config_id, load_pipeline_config
 from beauty.core.contracts import PipelineResult, StageRecord, StageStatus
-from beauty.io.writer import write_failures_csv, write_image, write_metrics_csv
+from beauty.io.writer import write_image, write_metrics_csv
 from beauty.metrics import metrics as metrics_mod
 from beauty.modules import color, exposure, freq_enhance, restore, skin_detect, smooth
 
@@ -35,7 +35,7 @@ from beauty.modules import color, exposure, freq_enhance, restore, skin_detect, 
 _STAGE_ORDER = ["restore", "skin_detect", "exposure", "smooth", "freq_enhance", "color"]
 
 
-def _new_run_id() -> str:
+def new_run_id() -> str:
     """UTC 时间戳 + 随机短后缀。"""
     ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"{ts}-{uuid.uuid4().hex[:6]}"
@@ -56,25 +56,34 @@ def run_pipeline(image_bgr: np.ndarray,
                  output_root: str | None = None,
                  sample_id: str | None = None,
                  regions: Mapping[str, np.ndarray] | None = None,
-                 reference_bgr: np.ndarray | None = None) -> PipelineResult:
+                 reference_bgr: np.ndarray | None = None,
+                 run_id: str | None = None,
+                 input_relative_path: str | None = None) -> PipelineResult:
     """按固定顺序执行流水线，返回 PipelineResult。
 
     mode 取 preview / process / evaluation：
     - preview：只在内存处理，不创建持久化目录；
     - process / evaluation：写结果图与运行记录。
+
+    run_id 给定时复用该标识（批处理共享同一 run_id，对齐 arch 7.3）；
+    未给定且需要持久化时自动分配。
+    input_relative_path 用于失败记录，须为相对路径（不含本机绝对路径）。
     """
     if mode not in {"preview", "process", "evaluation"}:
         raise ValueError(f"未知运行模式：{mode}")
 
-    resolved = {"pipeline": dict(pipeline_cfg), "modules": {k: dict(v) for k, v in module_cfgs.items()}}
+    resolved = {"pipeline": dict(pipeline_cfg),
+                "modules": {k: dict(v) for k, v in module_cfgs.items()}}
     config_id = compute_config_id(resolved)
-    run_id = _new_run_id() if mode in {"process", "evaluation"} else None
+    if mode in {"process", "evaluation"}:
+        run_id = run_id or new_run_id()
+    else:
+        run_id = None
     result = PipelineResult(run_id=run_id, config_id=config_id, mode=mode)
 
     current = image_bgr.copy()
     mask: np.ndarray | None = None
     diagnostics: dict[str, np.ndarray] = {}
-    failures: list[dict] = []
 
     def _cfg(name: str) -> Mapping[str, Any]:
         return module_cfgs.get(name, {}) or {}
@@ -100,18 +109,19 @@ def run_pipeline(image_bgr: np.ndarray,
                 current = freq_enhance.process(current, mask, _cfg("freq_enhance"))
                 diag_cfg = (pipeline_cfg.get("diagnostics", {}) or {})
                 if bool(diag_cfg.get("frequency_enabled", False)):
-                    diagnostics = dict(freq_enhance.get_frequency_diagnostics(current, _cfg("freq_enhance")))
+                    diagnostics = dict(
+                        freq_enhance.get_frequency_diagnostics(current, _cfg("freq_enhance")))
             elif stage == "color":
                 current = color.process(current, mask, _cfg("color"))
             result.stages.append(StageRecord(stage, StageStatus.OK, "完成"))
         except Exception as exc:  # 单阶段失败不伪造最终结果
             result.stages.append(StageRecord(stage, StageStatus.FAILED, str(exc)))
-            failures.append({
-                "run_id": run_id or "", "input_relative_path": sample_id or "",
+            result.failures.append({
+                "run_id": run_id or "",
+                "input_relative_path": input_relative_path or sample_id or "",
                 "stage": stage, "error_type": type(exc).__name__, "error_message": str(exc),
             })
             result.error = f"阶段 {stage} 失败：{exc}"
-            _persist(result, current, diagnostics, failures, output_root, sample_id, regions, reference_bgr)
             return result
 
     result.final_bgr = current
@@ -122,16 +132,17 @@ def run_pipeline(image_bgr: np.ndarray,
         result.metrics = dict(metrics_mod.compute_image_metrics(
             image_bgr, current, regions or {}, reference_bgr, mask, _cfg("metrics")))
 
-    _persist(result, current, diagnostics, failures, output_root, sample_id, regions, reference_bgr)
+    _persist(result, current, diagnostics, output_root, sample_id)
     return result
 
 
 def _persist(result: PipelineResult, final_bgr: np.ndarray,
-             diagnostics: Mapping[str, np.ndarray], failures: list[dict],
-             output_root: str | None, sample_id: str | None,
-             regions: Mapping[str, np.ndarray] | None,
-             reference_bgr: np.ndarray | None) -> None:
-    """按运行模式落盘。preview 不创建任何持久化目录。"""
+             diagnostics: Mapping[str, np.ndarray],
+             output_root: str | None, sample_id: str | None) -> None:
+    """按运行模式落盘图像与指标。preview 不创建任何持久化目录。
+
+    failures.csv 为运行级产物，由调用方按 run_id 汇总写出（对齐 arch 7.3）。
+    """
     if result.mode == "preview" or not output_root or not result.run_id:
         return
     sample = sample_id or "sample"
@@ -141,9 +152,8 @@ def _persist(result: PipelineResult, final_bgr: np.ndarray,
         write_image(out_path, final_bgr)
         for name, img in diagnostics.items():
             write_image(os.path.join(output_root, "data", "output", result.run_id,
-                                     "samples", sample, "diagnostics", "frequency", f"{name}.png"), img)
-    if failures:
-        write_failures_csv(os.path.join(output_root, "results", result.run_id, "failures.csv"), failures)
+                                     "samples", sample, "diagnostics", "frequency",
+                                     f"{name}.png"), img)
     if result.mode == "evaluation" and result.metrics:
         rows = _metrics_to_rows(result)
         write_metrics_csv(os.path.join(output_root, "results", result.run_id, "metrics.csv"), rows)
@@ -162,7 +172,9 @@ def _metrics_to_rows(result: PipelineResult) -> list[dict]:
                 "value": metric.get("value") if isinstance(metric, Mapping) else metric,
                 "unit": metric.get("unit", "") if isinstance(metric, Mapping) else "",
                 "valid": metric.get("valid", True) if isinstance(metric, Mapping) else True,
-                "not_applicable_reason": metric.get("not_applicable_reason", "") if isinstance(metric, Mapping) else "",
+                "not_applicable_reason": (
+                    metric.get("not_applicable_reason", "")
+                    if isinstance(metric, Mapping) else ""),
                 "config_id": result.config_id,
             })
     return rows
@@ -178,4 +190,4 @@ def _iter_metric_records(records: Mapping[str, Any]):
             yield "", {key: value}
 
 
-__all__ = ["run_pipeline"]
+__all__ = ["run_pipeline", "new_run_id"]

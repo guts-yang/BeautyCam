@@ -18,7 +18,7 @@ import pytest
 
 from beauty.core.config import load_module_config, load_pipeline_config
 from beauty.core.pipeline import run_pipeline
-from beauty.io.writer import FAILURES_FIELDS, METRICS_FIELDS, write_failures_csv
+from beauty.io.writer import FAILURES_FIELDS, METRICS_FIELDS
 
 _MODULES = ["skin_detect", "exposure", "smooth", "freq_enhance", "restore", "color", "metrics"]
 
@@ -79,17 +79,66 @@ def test_process_mode_writes_final_and_records(tmp_path):
 
 
 def test_batch_failure_isolation(tmp_path):
-    """批处理失败隔离：单样本失败写入 failures.csv，后续样本继续。"""
-    failures_path = tmp_path / "results" / "run1" / "failures.csv"
-    rows = [{
-        "run_id": "run1", "input_relative_path": "broken.png",
-        "stage": "skin_detect", "error_type": "ImageReadError",
-        "error_message": "无法解码图像",
-    }]
-    write_failures_csv(str(failures_path), rows)
-    assert failures_path.is_file()
-    header = failures_path.read_text(encoding="utf-8").splitlines()[0]
+    """批处理失败隔离（端到端）：坏文件写入 failures.csv，好样本继续并共享同一 run_id。"""
+    from main import main as cli_main
+
+    in_dir = tmp_path / "in"
+    in_dir.mkdir()
+    rng = np.random.default_rng(11)
+    for name in ("a.jpg", "b.jpg"):
+        cv2.imwrite(str(in_dir / name), rng.integers(0, 256, (40, 48, 3), dtype=np.uint8))
+    (in_dir / "broken.png").write_text("not an image", encoding="utf-8")
+
+    out_root = tmp_path / "out"
+    code = cli_main(["--input", str(in_dir), "--output-root", str(out_root), "--mode", "process"])
+    assert code == 0
+
+    results_dir = out_root / "results"
+    csvs = list(results_dir.glob("*/failures.csv"))
+    assert len(csvs) == 1, "一次批处理应只产生一个 failures.csv（共享 run_id）"
+    text = csvs[0].read_text(encoding="utf-8")
+    header, *rows = text.splitlines()
     assert header.split(",") == FAILURES_FIELDS
+    assert len(rows) == 1 and "broken.png" in rows[0]
+    assert str(tmp_path) not in text, "failures.csv 不得包含本机绝对路径"
+
+    run_id = csvs[0].parent.name
+    assert (out_root / "data" / "output" / run_id / "samples" / "0000" / "final.png").is_file()
+    assert (out_root / "data" / "output" / run_id / "samples" / "0001" / "final.png").is_file()
+
+
+def test_single_run_shares_one_run_id_with_failures(tmp_path):
+    """单图阶段失败时，failures.csv 写入该 run 目录。"""
+    from beauty.core.pipeline import run_pipeline
+    img = _synthetic_bgr()
+
+    def _boom(image_bgr, skin_mask, cfg):
+        raise RuntimeError("模拟 M3 失败")
+
+    module_cfgs = _module_cfgs()
+    module_cfgs["smooth"] = {"__boom__": True}
+    import beauty.modules.smooth as smooth_mod
+    original = smooth_mod.process
+    smooth_mod.process = _boom
+    try:
+        result = run_pipeline(img, load_pipeline_config(), module_cfgs, mode="process",
+                              output_root=str(tmp_path), sample_id="0000",
+                              run_id="fixedrun", input_relative_path="in/a.jpg")
+    finally:
+        smooth_mod.process = original
+    assert not result.succeeded
+    assert result.run_id == "fixedrun"
+    assert len(result.failures) == 1
+    assert result.failures[0]["stage"] == "smooth"
+    assert result.failures[0]["input_relative_path"] == "in/a.jpg"
+
+
+def test_preview_has_no_failures_side_effects(tmp_path):
+    """preview 模式不创建 results 目录。"""
+    from beauty.core.pipeline import run_pipeline
+    img = _synthetic_bgr()
+    run_pipeline(img, load_pipeline_config(), _module_cfgs(), mode="preview")
+    assert not (tmp_path / "results").exists()
 
 
 def test_metrics_row_fields_align_with_contract():
