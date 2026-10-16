@@ -47,7 +47,7 @@ class PipelineResult:
     - metrics：M7 指标记录；preview 模式为空。
     - succeeded：整条流水线是否成功产出最终图。
     - error：失败时的可读原因。
-    """
+"""
 
     run_id: str | None
     config_id: str
@@ -56,6 +56,7 @@ class PipelineResult:
     stages: list[StageRecord] = field(default_factory=list)
     skin_mask: np.ndarray | None = None
     metrics: dict[str, dict[str, Any]] = field(default_factory=dict)
+    failures: list[dict[str, Any]] = field(default_factory=list)
     succeeded: bool = False
     error: str = ""
 
@@ -66,4 +67,28 @@ class PipelineResult:
         return f"处理失败：{self.error or '未知错误'}"
 
 
-__all__ = ["StageStatus", "StageRecord", "PipelineResult"]
+@dataclass
+class BatchOutcome:
+    """一次批处理的汇总结果，供 CLI/UI 展示。
+
+    字段含义：
+    - run_id：本次批处理共享的运行标识（对齐 arch 7.3：一次批处理共享一个 run_id）。
+    - total / succeeded / failed：输入总数、成功数、失败数。
+    - failures：失败项记录，字段与 failures.csv 一致（已剔除本机绝对路径）。
+    - messages：每个样本一行可展示文本。
+    """
+
+    run_id: str | None
+    total: int
+    succeeded: int
+    failed: int
+    failures: list[dict[str, Any]] = field(default_factory=list)
+    messages: list[str] = field(default_factory=list)
+
+    def status_text(self) -> str:
+        """返回可直接展示给用户的批处理状态文本。"""
+        return (f"批处理完成：成功 {self.succeeded}/{self.total}"
+                f"（run_id={self.run_id or 'preview'}）")
+
+
+__all__ = ["StageStatus", "StageRecord", "PipelineResult", "BatchOutcome"]
