@@ -83,6 +83,13 @@ python src/prepare_data.py fetch --out data/input/subset --num 40 \
     --manifest assets/evaluation_manifest.csv
 ```
 
-如已下载整包，则用 `merge` + `subset` 两个子命令。
+如已自行具备整包，则用 `subset`（先抽样、只合并抽中样本，不全量扫描）：
+
+```bash
+python src/prepare_data.py subset --root data/input/CelebAMask-HQ \
+    --out data/input/subset --num 40 --manifest assets/evaluation_manifest.csv
+```
+
+> 顶层约束：数据脚本只获取工作所需的最小样本子集，禁止下载整包或全量抽取。详见根目录 `README.md` 的「项目约束基线」与 `docs/baseline/arch.md` 第 5.2 节。
 
 > 数据集的候选方案横向评估与二次筛选的完整记录，见根目录 `README.md` 的「数据集」章节。

@@ -188,6 +188,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 
 ### 5.2 评测区域与数据对齐
 
+- **数据获取最小化（顶层约束）**：所有数据集脚本（下载、解压、预处理、抽样）只获取工作所需的最小样本子集，禁止下载完整数据集或全量抽取。本课题不训练深度模型，工作子集为 20~50 张；`prepare_data.py fetch` 以 HTTP Range 按需抽取，不下载整包。个别样本缺标注时按跳过处理，不得因此改为全量拉取。确需全量数据须走 `change-request`。
 - `src/prepare_data.py` 生成的子集目录为 `images/`、`masks/`、`skin_masks/`；GT 标签图按最近邻插值对齐到被测图尺寸。
 - CelebAMask-HQ 合并标签图中的皮肤标签索引为 1。五官 EPI 的候选标签为 `eye_g/l_eye/r_eye/l_brow/r_brow/mouth/u_lip/l_lip`，对应当前脚本的一基索引 `{3,4,5,6,7,10,11,12}`。
 - 固定评测集清单版本管理在 `assets/evaluation_manifest.csv`，至少记录 `sample_id,scene`；路径由数据根目录和 ID 依照固定规则构造，若写路径则只能是项目相对路径。清单不得包含机器绝对路径或图像像素。
