@@ -40,9 +40,23 @@ BeautyCam/
 │   ├── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
 │   └── 社群分享文案.md           # 组内分派用的社群文案（板块认领 + 提交规范）
 ├── assets/
-│   └── test-images/            # 课程统一提供的标准测试图集（50 张）
-├── src/                        # 源码（主流程与各处理模块）
-│   └── prepare_data.py         # CelebAMask-HQ 数据预处理
+│   ├── test-images/            # 课程统一提供的标准测试图集（50 张）
+│   └── evaluation_manifest.csv # 固定评测样本清单（sample_id,scene）
+├── src/                        # 源码
+│   ├── main.py                 # CLI 薄入口（单图 / 批处理）
+│   ├── app.py                  # Streamlit 薄入口（本地演示）
+│   ├── prepare_data.py         # CelebAMask-HQ 数据预处理
+│   └── beauty/                 # 主包（分层：core / io / modules / metrics）
+│       ├── core/               # 编排、配置与入口契约（A）
+│       ├── io/                 # 图像读写与产物落盘（A）
+│       ├── modules/            # M1–M6 算法模块（M1–M4 归 B，M5/M6 归 C）
+│       └── metrics/            # M7 评价与指标（C）
+├── tests/
+│   ├── unit/                   # 单元测试与契约守卫（合成数据）
+│   └── integration/            # 集成与回归测试
+├── config/                     # pipeline.yaml + 各模块独立 YAML
+├── .github/workflows/          # CI：单元/契约/集成三 job 回归流水线
+├── .streamlit/config.toml      # Streamlit 主题映射
 ├── data/
 │   ├── input/                  # 输入素材（CelebAMask-HQ 子集等）
 │   └── output/                 # 处理结果图
@@ -133,7 +147,48 @@ BeautyCam/
 执行方式：先合并分散掩码，再抽取子集，输出原图、合并掩码、皮肤掩码三份内容。
 
 ```bash
-cd src
-python prepare_data.py merge  --root ../data/input/CelebAMask-HQ
-python prepare_data.py subset --root ../data/input/CelebAMask-HQ --out ../data/input/subset --num 40
+python src/prepare_data.py merge  --root data/input/CelebAMask-HQ
+python src/prepare_data.py subset --root data/input/CelebAMask-HQ \
+    --out data/input/subset --num 40 --manifest assets/evaluation_manifest.csv
 ```
+
+生成的 `assets/evaluation_manifest.csv` 含 `sample_id,scene` 两列，不含机器绝对路径与图像像素。`scene` 为占位标签，五类场景（`normal/backlight/lowlight/blemish/blur`）须人工核验后确认，不得凭随机种子宣称已实现分层抽样。
+
+## 快速开始
+
+环境要求 Python 3.10.x。所有直接依赖已精确 pin 在 `requirements.txt`。
+
+```bash
+# 1. 创建虚拟环境并安装依赖
+python3.10 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+
+# 2. 单图处理（结果写入 data/output/<run_id>/）
+python src/main.py --input assets/test-images/lena512.BMP
+
+# 3. 目录批处理（失败项写入 results/<run_id>/failures.csv 后继续）
+python src/main.py --input data/input/subset/images
+
+# 4. 本地 Streamlit 演示（仅供本地，不作为公网服务）
+streamlit run src/app.py
+
+# 5. 单元测试与契约守卫（不需要数据集）
+python -m pytest -m "not integration"
+
+# 6. 集成回归（需先准备本地数据集）
+export BEAUTYCAM_DATA_ROOT=data/input/subset
+python -m pytest -m integration
+```
+
+配置位于 `config/`：`pipeline.yaml` 放固定顺序、阶段开关与运行模式；各模块参数放独立 YAML。参数覆盖优先级为代码默认值 < YAML < 本次 CLI/UI 显式覆盖。
+
+## 测试与回归
+
+测试分层与回归门禁见 [设计方案-人脸美颜.md](docs/设计方案-人脸美颜.md) 第 6 章：
+
+- 单元测试与契约守卫（`pytest -m "not integration"`）：每次 PR 必跑，只使用内存合成数据。
+- 集成测试（`pytest -m integration`）：合并 `main` 后执行，需本地数据集与固定 manifest。
+- 回归基线分契约、数值、图像三类；失败不得用 `skip`/`xfail`/放宽阈值规避，基线变更走 `change-request`。
+
+CI 见 `.github/workflows/tests.yml`，含 `unit-regression`、`contract-guard`、`integration-regression` 三个 job，统一在 Ubuntu + Python 3.10.x 执行。
