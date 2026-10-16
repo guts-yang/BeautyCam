@@ -1,5 +1,9 @@
 # 焕颜相机 BeautyCam —— 人脸美颜相机（数字图像处理课程设计，2026）
 
+<p align="center">
+  <img src="report/figures/canvas.png" alt="BeautyCam 项目总览" width="100%">
+</p>
+
 《数字图像处理》课程设计（大作业）项目代码、数据与文档仓库。
 
 - 学院：计算机科学与工程学院
