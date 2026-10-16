@@ -2,7 +2,7 @@ name: tests
 
 # 回归流水线（对齐设计方案 6.5）：
 # - pull_request / push main：快速回归（单测 + 契约守卫）
-# - push main / 手动：全量回归（含 integration，需自行配置数据根目录）
+# - 集成回归：端到端用例（合成数据，不需要数据集），随 PR 与 push 都执行
 on:
   pull_request:
   push:
@@ -22,7 +22,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-- name: Run unit tests + contract guard
+      - name: Run unit tests + contract guard
         run: python -m pytest -m "not integration and not end_to_end"
 
   contract-guard:
@@ -40,7 +40,7 @@ jobs:
       - name: Verify frozen contracts
         run: python -m pytest tests/unit/test_contracts.py -v
 
-integration-regression:
+  integration-regression:
     name: integration-regression
     runs-on: ubuntu-latest
     # 端到端用例用合成数据 + 临时目录，不需要数据集，因此随 PR 与 push 都执行。
