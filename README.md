@@ -144,13 +144,23 @@ BeautyCam/
 | 含眼镜 / 刘海遮挡 | 肤色检测的鲁棒性 |
 | 轻微运动模糊 | 复原模块 |
 
-执行方式：先合并分散掩码，再抽取子集，输出原图、合并掩码、皮肤掩码三份内容。
+执行方式有两种，推荐第一种：**从公开镜像按需抽取，不下载 3.15GB 整包**。脚本先读 zip 中央目录（约 50MB，40 万个条目的索引不可避免），再对需要的样本发起 HTTP Range 请求只取那几个字节。实测抽取 40 张共拉取约 66MB，相比整包节省约 98%。
+
+```bash
+# 推荐：远程按需抽取（不需要先下载整包）
+python src/prepare_data.py fetch --out data/input/subset --num 40 \
+    --manifest assets/evaluation_manifest.csv
+```
+
+如果已自行下载完整数据集（授权仅限非商业研究，须自行获取），则走本地路径：先合并分散掩码，再抽取子集，输出原图、合并掩码、皮肤掩码三份内容。`fetch` 与 `subset` 的抽样规则一致（排序 + 固定种子 42），同一数据集下产出的 `sample_id` 相同，可互相校验。
 
 ```bash
 python src/prepare_data.py merge  --root data/input/CelebAMask-HQ
 python src/prepare_data.py subset --root data/input/CelebAMask-HQ \
     --out data/input/subset --num 40 --manifest assets/evaluation_manifest.csv
 ```
+
+输出结构为 `images/`（1024×1024 原图）、`masks/`（512×512 合并索引掩码，索引 1 为皮肤）、`skin_masks/`（皮肤二值掩码，uint8 0/255）。个别样本在官方数据集中缺皮肤标注，`fetch` 会自动跳过，保证 GT 完整。
 
 生成的 `assets/evaluation_manifest.csv` 含 `sample_id,scene` 两列，不含机器绝对路径与图像像素。`scene` 为占位标签，五类场景（`normal/backlight/lowlight/blemish/blur`）须人工核验后确认，不得凭随机种子宣称已实现分层抽样。
 
