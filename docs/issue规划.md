@@ -53,7 +53,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | 一 平台与编排 | A（队长，GitHub `guts-yang`） | R8、R9、R10、R11、R12 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`src/prepare_data.py`、`config/pipeline.yaml`、`tests/integration/`、`.github/`、`requirements.txt`、`pytest.ini`、`.streamlit/config.toml`、`.gitignore` |
 | 二 检测与增强 | B（GitHub `qixing1227`） | R1、R1.1、R1.2、R2、R2.1、R2.2、R2.3、R3、R3.1、R3.2、R4 | `src/beauty/modules/{skin_detect,exposure,smooth,freq_enhance}.py`、`config/{skin_detect,exposure,smooth,freq_enhance}.yaml`、`tests/unit/test_{skin_detect,exposure,smooth,freq_enhance}.py` |
-| 三 复原与评价 | C（GitHub `Shiqi0502`，2026-10-17 加入仓库后指派） | R5、R6、R7、R7.1、R7.2、R13 | `src/beauty/modules/{restore,color}.py`、`src/beauty/metrics/metrics.py`、`config/{restore,color,metrics}.yaml`、`tests/unit/test_{restore,color,metrics}.py` |
+| 三 复原与评价 | C（GitHub `Shiqi0502`，已加入仓库并指派） | R5、R6、R7、R7.1、R7.2、R13 | `src/beauty/modules/{restore,color}.py`、`src/beauty/metrics/metrics.py`、`config/{restore,color,metrics}.yaml`、`tests/unit/test_{restore,color,metrics}.py` |
 
 ### 3.2 关键解耦点
 
@@ -224,7 +224,7 @@ g --> d2
 | --- | --- | --- | --- |
 | A（GitHub `guts-yang`） | I-01~I-08、I-24 的平台分块、I-27 | `src/beauty/core/`、`src/beauty/io/`、`src/main.py`、`src/app.py`、`config/pipeline.yaml`、CI | 提供三重契约与编排入口 |
 | B（GitHub `qixing1227`） | I-09~I-16、I-24 的增强分块 | `modules/{skin_detect,exposure,smooth,freq_enhance}.py` + 对应 YAML | 只消费 image/mask 契约，不产出跨模块状态 |
-| C（GitHub `Shiqi0502`，2026-10-17 加入仓库后指派） | I-17~I-23、I-24 的评价分块 | `modules/{restore,color}.py`、`metrics/metrics.py` + 对应 YAML | M7 只做纯计算，落盘交给 A 的 `io` |
+| C（GitHub `Shiqi0502`，已加入仓库并指派） | I-17~I-23、I-24 的评价分块 | `modules/{restore,color}.py`、`metrics/metrics.py` + 对应 YAML | M7 只做纯计算，落盘交给 A 的 `io` |
 
 负载估算（人日）：
 

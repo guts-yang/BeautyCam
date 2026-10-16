@@ -22,7 +22,7 @@
 
 三份文档均已锁定为 v1.0 基线（已确认）。数值阈值按文档内预设值执行，开发中经实测确需调整时走 `change-request` 变更流程，不得单方面放宽。
 
-模块归属口径（三板块，与 `docs/issue规划.md` 一致）：A（GitHub `guts-yang`）负责流程编排与入口（`core/`、`io/`、CLI、UI）；B（GitHub `qixing1227`）负责 M1–M4（`skin_detect`、`exposure`、`smooth`、`freq_enhance`）；C（GitHub `Shiqi0502`，2026-10-17 加入仓库后指派）负责 M5–M7（`restore`、`color`、`metrics`）。
+模块归属口径（三板块，与 `docs/issue规划.md` 一致）：A（GitHub `guts-yang`）负责流程编排与入口（`core/`、`io/`、CLI、UI）；B（GitHub `qixing1227`）负责 M1–M4（`skin_detect`、`exposure`、`smooth`、`freq_enhance`）；C（GitHub `Shiqi0502`）负责 M5–M7（`restore`、`color`、`metrics`）。
 
 ## 目录结构
 
