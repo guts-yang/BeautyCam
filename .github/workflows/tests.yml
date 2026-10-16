@@ -2,7 +2,7 @@ name: tests
 
 # 回归流水线（对齐设计方案 6.5）：
 # - pull_request / push main：快速回归（单测 + 契约守卫）
-# - push main / 手动：全量回归（含 integration，需自行配置数据根目录）
+# - 集成回归：端到端用例（合成数据，不需要数据集），随 PR 与 push 都执行
 on:
   pull_request:
   push:
@@ -23,7 +23,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
       - name: Run unit tests + contract guard
-        run: python -m pytest -m "not integration"
+        run: python -m pytest -m "not integration and not end_to_end"
 
   contract-guard:
     name: contract-guard
@@ -43,8 +43,7 @@ jobs:
   integration-regression:
     name: integration-regression
     runs-on: ubuntu-latest
-    # 只在合并到 main 或手动触发时执行；CI 不下载受限数据。
-    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    # 端到端用例用合成数据 + 临时目录，不需要数据集，因此随 PR 与 push 都执行。
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -54,6 +53,6 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt
-      - name: Run integration regression
-        # 无本地数据集时用例会明确报告「前置条件未满足」，不伪装为通过。
-        run: python -m pytest -m integration -v
+      - name: Run end-to-end regression
+        # 需要本地数据集的 `integration` 用例在此不选，由本地 / 手动全量回归覆盖。
+        run: python -m pytest -m end_to_end -v

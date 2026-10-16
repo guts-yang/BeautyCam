@@ -174,9 +174,12 @@ python src/main.py --input data/input/subset/images
 streamlit run src/app.py
 
 # 5. 单元测试与契约守卫（不需要数据集）
-python -m pytest -m "not integration"
+python -m pytest -m "not integration and not end_to_end"
 
-# 6. 集成回归（需先准备本地数据集）
+# 6. 端到端集成回归（合成数据 + 临时目录，不需要数据集，CI 常跑）
+python -m pytest -m end_to_end
+
+# 7. 数据集评测回归（需先准备本地数据集与固定 manifest）
 export BEAUTYCAM_DATA_ROOT=data/input/subset
 python -m pytest -m integration
 ```
@@ -187,8 +190,9 @@ python -m pytest -m integration
 
 测试分层与回归门禁见 [设计方案-人脸美颜.md](docs/设计方案-人脸美颜.md) 第 6 章：
 
-- 单元测试与契约守卫（`pytest -m "not integration"`）：每次 PR 必跑，只使用内存合成数据。
-- 集成测试（`pytest -m integration`）：合并 `main` 后执行，需本地数据集与固定 manifest。
+- 单元测试与契约守卫（`pytest -m "not integration and not end_to_end"`）：每次 PR 必跑，只使用内存合成数据。
+- 端到端回归（`pytest -m end_to_end`）：合成数据 + 临时目录跑真实 CLI 全链路，不需要数据集，随 PR 与 push 都执行，是集成 job 的实质内容。
+- 数据集评测回归（`pytest -m integration`）：需本地数据集与固定 manifest；未配置 `BEAUTYCAM_DATA_ROOT` 时明确跳过，不伪装为通过。
 - 回归基线分契约、数值、图像三类；失败不得用 `skip`/`xfail`/放宽阈值规避，基线变更走 `change-request`。
 
-CI 见 `.github/workflows/tests.yml`，含 `unit-regression`、`contract-guard`、`integration-regression` 三个 job，统一在 Ubuntu + Python 3.10.x 执行。
+CI 见 `.github/workflows/tests.yml`，含 `unit-regression`、`contract-guard`、`integration-regression` 三个 job，统一在 Ubuntu + Python 3.10.x 执行。`main` 已开启分支保护：上述前两个 job 为必需状态检查，合并需经 PR，禁止直接 push 与强推。
