@@ -289,3 +289,4 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 
 - 2026-10-17 change-request #1（A 发起）：UI 部署约束放宽——允许部署到 Streamlit Community Cloud 用于课程演示，上传图仅进程内存处理、不持久化的原约束不变；合并前须经至少一名其他成员评审。
 - 2026-10-17 change-request #2（A 发起）：云端部署 Python 版本约束——Streamlit Cloud 平台已不提供 3.10/3.11 选项，云端部署环境定为 Python 3.12（平台可选下限）；本地与 CI 仍用 3.10.x，CI 增加双版本矩阵守护。pin 依赖已在 3.12 wheel 检验通过，代码无 API 兼容性问题。
+- 2026-10-17 change-request #3（A 发起）：CI 与测试去重——删除 contract-guard job（契约用例已随 unit-regression 全量执行，属重复安装与重复运行）；test_main_flow.py 回归 run_pipeline 直调层级，CLI 端到端用例统一收口到 test_end_to_end.py，重复用例去重，共享常量抽至 tests/conftest.py；matplotlib（仅 tools 可视化脚本使用）移出 requirements.txt 改为可选依赖，scikit-image（M7 指标预留）保留。分支保护必需检查同步改为两 job 四矩阵项。

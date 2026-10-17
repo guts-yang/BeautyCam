@@ -13,7 +13,8 @@
     - skin_mask_contact.png  全部样本的「原图 / 皮肤叠加」contact sheet
     - skin_mask_stats.csv    每张样本的皮肤占比统计
 
-依赖：numpy、opencv-python-headless、matplotlib（见 requirements.txt）。
+依赖：numpy、opencv-python-headless（见 requirements.txt）；matplotlib 为可选依赖，
+本地绘图前执行 `python -m pip install matplotlib==3.9.2`。
 """
 
 from __future__ import annotations
