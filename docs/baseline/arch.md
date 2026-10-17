@@ -17,7 +17,7 @@
 
 | 层 | 选型 | 约束 |
 | --- | --- | --- |
-| 语言 | Python | 最低 3.10；CI 与开发统一使用 3.10.x，试装后确认 |
+| 语言 | Python | 最低 3.10；本地与 CI 用 3.10.x，云端部署用 3.12（Streamlit Cloud 可选下限），试装后确认 |
 | 图像处理 | OpenCV | 使用 `opencv-python-headless`；不得同时安装 `opencv-python` 与 headless 发行包 |
 | 数值计算 | NumPy | 直接依赖精确 pin |
 | 演示 UI | Streamlit | 直接依赖精确 pin，本地启动 |
@@ -263,7 +263,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 
 ## 9. 本地运行与交付
 
-- 本地环境：Python 3.10.x venv；不要求容器或云环境。
+- 本地环境：Python 3.10.x venv；不要求容器或云环境。云端部署（Streamlit Community Cloud）使用 Python 3.12，当前 pin 依赖在 3.12 有完整预编译 wheel，已验证可安装。
 - CLI：`python src/main.py --help`，按帮助运行单图或批处理。
 - UI：本地入口 `streamlit run src/app.py` 作为主运行方式；课程演示允许部署到 Streamlit Community Cloud（绑定 main 分支，push 自动同步），上传原图只在本地/云端进程内存处理，不自动复制持久化，该约束不因部署形态改变；本地运行保留为离线兜底。
 - 环境安装：`python -m pip install -r requirements.txt`。
@@ -276,7 +276,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 以下条目已按预设值锁定为基线，开发中如需调整走 `change-request`。
 
 - [x] OpenCV 采用 `opencv-python-headless` 发行包。
-- [x] Python 3.10.x 作为统一本地与 CI 版本。
+- [x] Python 3.10.x（本地与 CI）+ 3.12（云端部署）双版本约束，pin 依赖在两版本均有预编译 wheel。
 - [x] 所有直接依赖精确 pin，具体版本在干净环境试装后补入。
 - [x] 分层目录与按模块独立 YAML 配置。
 - [x] M5 默认关闭，合成模糊评测时显式启用。
@@ -288,3 +288,4 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 变更记录：
 
 - 2026-10-17 change-request #1（A 发起）：UI 部署约束放宽——允许部署到 Streamlit Community Cloud 用于课程演示，上传图仅进程内存处理、不持久化的原约束不变；合并前须经至少一名其他成员评审。
+- 2026-10-17 change-request #2（A 发起）：云端部署 Python 版本约束——Streamlit Cloud 平台已不提供 3.10/3.11 选项，云端部署环境定为 Python 3.12（平台可选下限）；本地与 CI 仍用 3.10.x，CI 增加双版本矩阵守护。pin 依赖已在 3.12 wheel 检验通过，代码无 API 兼容性问题。
