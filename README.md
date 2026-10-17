@@ -12,6 +12,8 @@
 - 选题：人脸美颜相机——肤色保护与细节增强
 - 技术栈：Python + OpenCV + NumPy（全程传统方法，不使用深度学习）
 
+在线演示：[beauty-cam.streamlit.app](https://beauty-cam.streamlit.app)（Streamlit Community Cloud，绑定 `main` 分支自动部署；上传图仅在进程内存处理，不持久化）。
+
 ## 项目约束基线（新成员请先读）
 
 本项目采用规范驱动开发（SDD），开发前必须先理解以下三份基线文档（位于 `docs/baseline/`）。它们定义了"什么事能做、怎么做"，任何实现都不得违反：
@@ -47,7 +49,7 @@ BeautyCam/
 │   └── 社群分享文案.md           # 组内分派用的社群文案（板块认领 + 提交规范）
 ├── src/                        # 源码
 │   ├── main.py                 # CLI 薄入口（单图 / 批处理，preview/process/evaluation 三模式）
-│   ├── app.py                  # Streamlit 薄入口（本地演示，不作为公网服务）
+│   ├── app.py                  # Streamlit 薄入口（本地与云端演示共用）
 │   ├── prepare_data.py         # CelebAMask-HQ 数据预处理（fetch/subset/merge 三命令）
 │   └── beauty/                 # 主包（分层：core / io / modules / metrics）
 │       ├── core/               # 编排与配置层（A）：pipeline.py 流水线编排、config.py 配置加载、contracts.py 数据契约
@@ -202,7 +204,9 @@ python src/main.py --input assets/test-images/lena512.BMP
 # 3. 目录批处理（失败项写入 results/<run_id>/failures.csv 后继续）
 python src/main.py --input data/input/subset/images
 
-# 4. 本地 Streamlit 演示（仅供本地，不作为公网服务）
+# 4. 在线演示（推荐，无需本地环境）
+#    打开 https://beauty-cam.streamlit.app 即可交互
+#    本地运行作为离线兜底：
 streamlit run src/app.py
 
 # 5. 单元测试与契约守卫（不需要数据集）
