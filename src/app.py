@@ -19,25 +19,39 @@ from beauty.core.pipeline import run_pipeline
 
 _MODULES = ["skin_detect", "exposure", "smooth", "freq_enhance", "restore", "color", "metrics"]
 
+_MAX_UPLOAD_MB = 20
 
 def _decode(uploaded) -> np.ndarray | None:
     data = np.frombuffer(uploaded.read(), dtype=np.uint8)
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
+@st.cache_resource(show_spinner=False)
+def _load_configs() -> tuple[dict, dict[str, dict]]:
+    """配置只与仓库文件相关，跨会话缓存，UI 覆盖不回写（arch 第 6 节）。"""
+    pipeline_cfg = load_pipeline_config()
+    module_cfgs = {n: load_module_config(n) for n in _MODULES}
+    return pipeline_cfg, module_cfgs
 
 def main() -> None:
     st.set_page_config(page_title="焕颜相机 BeautyCam", layout="wide")
     st.title("焕颜相机 BeautyCam")
     st.caption("上传人脸照片，调整参数查看美颜效果。原图仅在本地内存处理，不会自动保存。")
 
-    uploaded = st.file_uploader("上传图片（JPG / JPEG / PNG / BMP）",
-                                type=["jpg", "jpeg", "png", "bmp"])
+    uploaded = st.file_uploader("上传图片（JPG / JPEG / PNG / BMP，最大 20MB）",
+                                type=["jpg", "jpeg", "png", "bmp"],
+                                accept_multiple_files=False)
     smooth_strength = st.slider("磨皮强度", 0.0, 1.0, 0.5, 0.05)
     exposure_gain = st.slider("曝光改善", 0.0, 1.0, 0.3, 0.05)
     color_temp = st.slider("色温调整", -1.0, 1.0, 0.0, 0.1)
 
     if uploaded is None:
+        st.session_state.pop("result", None)
+        st.session_state.pop("last_params", None)
         st.info("请先上传一张图片。")
+        return
+
+    if uploaded.size > _MAX_UPLOAD_MB * 1024 * 1024:
+        st.error(f"图片过大（{uploaded.size / 1024 / 1024:.1f}MB），请上传不超过 {_MAX_UPLOAD_MB}MB 的图片。")
         return
 
     image = _decode(uploaded)
@@ -45,16 +59,23 @@ def main() -> None:
         st.error("无法解码该文件，请确认是有效的 JPG/JPEG/PNG/BMP 图片。")
         return
 
-    pipeline_cfg = load_pipeline_config()
-    module_cfgs = {n: load_module_config(n) for n in _MODULES}
+    pipeline_cfg, module_cfgs = _load_configs()
     # UI 覆盖只作用于当前 run，不回写 YAML（arch 第 6 节）。
     module_cfgs["smooth"] = {**module_cfgs["smooth"], "strength": smooth_strength}
     module_cfgs["exposure"] = {**module_cfgs["exposure"], "gain": exposure_gain}
     module_cfgs["color"] = {**module_cfgs["color"], "temperature": color_temp}
 
-    if st.button("开始处理"):
-        with st.spinner("正在处理…"):
-            result = run_pipeline(image, pipeline_cfg, module_cfgs, mode="preview")
+    params = (smooth_strength, exposure_gain, color_temp)
+    if st.button("开始处理") or (
+        "result" in st.session_state
+        and st.session_state.get("last_params") == params
+    ):
+        if "result" not in st.session_state or st.session_state.get("last_params") != params:
+            with st.spinner("正在处理…"):
+                st.session_state["result"] = run_pipeline(
+                    image, pipeline_cfg, module_cfgs, mode="preview")
+            st.session_state["last_params"] = params
+        result = st.session_state["result"]
         col_left, col_right = st.columns(2)
         with col_left:
             st.subheader("原图")

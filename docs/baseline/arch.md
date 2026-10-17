@@ -265,7 +265,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 
 - 本地环境：Python 3.10.x venv；不要求容器或云环境。
 - CLI：`python src/main.py --help`，按帮助运行单图或批处理。
-- UI：`streamlit run src/app.py`，仅供本地演示，不作为公网服务部署；上传原图只在本地进程内存处理，不自动复制持久化。
+- UI：本地入口 `streamlit run src/app.py` 作为主运行方式；课程演示允许部署到 Streamlit Community Cloud（绑定 main 分支，push 自动同步），上传原图只在本地/云端进程内存处理，不自动复制持久化，该约束不因部署形态改变；本地运行保留为离线兜底。
 - 环境安装：`python -m pip install -r requirements.txt`。
 - README 必须说明环境安装、数据准备、单图运行、批量运行、UI 启动、集成测试命令及常见错误处理。
 - 提交源码和课程允许提交的文档/结果；不提交可执行二进制、数据集、派生图像或含个人身份信息的问卷原始数据。
@@ -284,3 +284,7 @@ def summarize_survey(responses: Sequence[Mapping[str, Any]],
 - [x] 运行目录、CSV 长表字段与 12 位配置摘要（按第 7 节）。
 - [x] 课程“可执行程序”按可运行 Python 源码解释；若教师要求打包二进制再走变更。
 - [x] UI 上传图不自动持久化，结果仅在显式保存/导出时保留。
+
+变更记录：
+
+- 2026-10-17 change-request #1（A 发起）：UI 部署约束放宽——允许部署到 Streamlit Community Cloud 用于课程演示，上传图仅进程内存处理、不持久化的原约束不变；合并前须经至少一名其他成员评审。
