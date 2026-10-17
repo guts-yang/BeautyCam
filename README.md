@@ -46,7 +46,6 @@ BeautyCam/
 │   ├── 设计方案-人脸美颜.md      # 设计方案（模块划分、分工、结果产出）
 │   ├── 架构设计与任务分工规划.md  # 架构设计与任务拆分（工作分解，三板块版）
 │   ├── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
-│   └── 社群分享文案.md           # 组内分派用的社群文案（板块认领 + 提交规范）
 ├── src/                        # 源码
 │   ├── main.py                 # CLI 薄入口（单图 / 批处理，preview/process/evaluation 三模式）
 │   ├── app.py                  # Streamlit 薄入口（本地与云端演示共用）
