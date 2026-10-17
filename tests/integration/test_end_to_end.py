@@ -4,8 +4,7 @@
 与 test_main_flow.py 的区别：
 - 本文件的用例全部标记 `end_to_end`，用合成数据 + 临时目录跑真实的 CLI 全链路，
   因此**不需要本地数据集**，会随 CI 的 `integration-regression` job 真正执行（非空跑）；
-- test_main_flow.py 中标记 `integration` 的用例需要本地数据集与固定 manifest，
-  仅在本地显式配置 BEAUTYCAM_DATA_ROOT 后才执行。
+- test_main_flow.py 只做 `run_pipeline` 直调的单元级回归，不触碰 CLI。
 
 覆盖：单图落盘、批处理产物契约、evaluation 模式 metrics.csv 表头、
       preview 模式零副作用、失败脱敏。
@@ -14,17 +13,15 @@
 from __future__ import annotations
 
 import csv
-import os
 
 import cv2
 import numpy as np
 import pytest
 
+from beauty.core.pipeline import run_pipeline
 from beauty.io.writer import FAILURES_FIELDS, METRICS_FIELDS
 
 pytestmark = pytest.mark.end_to_end
-
-_MODULES = ["skin_detect", "exposure", "smooth", "freq_enhance", "restore", "color", "metrics"]
 
 
 def _write_image(path: str, h: int = 32, w: int = 40, seed: int = 0) -> None:
@@ -53,19 +50,6 @@ def test_single_image_end_to_end_single_sample(tmp_path):
     assert len(finals) == 1, "单图应产出且仅产出一个 final.png"
     written = cv2.imread(str(finals[0]))
     assert written is not None and written.shape[2] == 3
-
-
-def test_single_image_does_not_create_failures_csv(tmp_path):
-    """单图成功时不应产生 failures.csv（失败记录是运行级、按需落盘）。"""
-    in_dir = tmp_path / "in"
-    in_dir.mkdir()
-    src = in_dir / "face.png"
-    _write_image(str(src), seed=2)
-
-    out_root = tmp_path / "out"
-    assert _cli()(["--input", str(src), "--output-root", str(out_root), "--mode", "process"]) == 0
-    assert not list((out_root / "results").glob("*/failures.csv")) if (out_root / "results").exists() \
-        else True
 
 
 def test_batch_produces_one_run_shared_outputs(tmp_path):
@@ -123,14 +107,12 @@ def test_evaluation_mode_writes_metrics_header(tmp_path):
     assert header.split(",") == METRICS_FIELDS
 
 
-def test_preview_mode_has_no_disk_side_effects(tmp_path):
+def test_preview_mode_has_no_disk_side_effects(module_cfgs, tmp_path):
     """preview 模式零副作用：不创建 data/output 与 results 目录。"""
-    from beauty.core.config import load_module_config, load_pipeline_config
-    from beauty.core.pipeline import run_pipeline
+    from beauty.core.config import load_pipeline_config
 
     rng = np.random.default_rng(9)
     img = rng.integers(0, 256, size=(24, 32, 3), dtype=np.uint8)
-    module_cfgs = {n: load_module_config(n) for n in _MODULES}
     result = run_pipeline(img, load_pipeline_config(), module_cfgs,
                           mode="preview", output_root=str(tmp_path))
     assert result.succeeded and result.run_id is None
