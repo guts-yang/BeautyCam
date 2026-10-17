@@ -34,7 +34,7 @@
 
 ```
 BeautyCam/
-├── docs/                       # 文档
+├── docs/                       # 项目文档
 │   ├── baseline/               # ★ 项目约束基线（新成员先读这里）
 │   │   ├── prd.md              # 需求模板基线（需求怎么写、验收标准格式）
 │   │   ├── design.md           # 设计约束基线（UI/UX 与算法代码红线）
@@ -45,30 +45,39 @@ BeautyCam/
 │   ├── 架构设计与任务分工规划.md  # 架构设计与任务拆分（工作分解，三板块版）
 │   ├── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
 │   └── 社群分享文案.md           # 组内分派用的社群文案（板块认领 + 提交规范）
-├── assets/
-│   ├── canvas.png             # 项目总览封面图（README 顶部引用）
-│   ├── test-images/            # 课程统一提供的标准测试图集（50 张）
-│   └── evaluation_manifest.csv # 固定评测样本清单（sample_id,scene）
 ├── src/                        # 源码
-│   ├── main.py                 # CLI 薄入口（单图 / 批处理）
-│   ├── app.py                  # Streamlit 薄入口（本地演示）
-│   ├── prepare_data.py         # CelebAMask-HQ 数据预处理
+│   ├── main.py                 # CLI 薄入口（单图 / 批处理，preview/process/evaluation 三模式）
+│   ├── app.py                  # Streamlit 薄入口（本地演示，不作为公网服务）
+│   ├── prepare_data.py         # CelebAMask-HQ 数据预处理（fetch/subset/merge 三命令）
 │   └── beauty/                 # 主包（分层：core / io / modules / metrics）
-│       ├── core/               # 编排、配置与入口契约（A）
-│       ├── io/                 # 图像读写与产物落盘（A）
+│       ├── core/               # 编排与配置层（A）：pipeline.py 流水线编排、config.py 配置加载、contracts.py 数据契约
+│       ├── io/                 # 图像读写层（A）：reader.py 输入读取、writer.py 产物按分层路径落盘
 │       ├── modules/            # M1–M6 算法模块（M1–M4 归 B，M5/M6 归 C）
-│       └── metrics/            # M7 评价与指标（C）
+│       │   ├── skin_detect.py  #   M1 肤色检测（输出皮肤掩码）
+│       │   ├── exposure.py     #   M2 曝光改善（CLAHE + 自适应伽马）
+│       │   ├── smooth.py       #   M3 空间域平滑与边缘保护
+│       │   ├── freq_enhance.py #   M4 频域磨皮与细节增强
+│       │   ├── restore.py      #   M5 运动模糊复原（独立运行，不依赖 M1）
+│       │   └── color.py        #   M6 白平衡与彩色增强
+│       └── metrics/            # M7 评价层（C）：metrics.py 计算 IoU/ΔE2000/EPI 等指标，纯计算不读写文件
+├── tools/
+│   └── visualize_skin_mask.py  # 皮肤掩码可视化（面板图 / 联系表 / 统计 CSV）
 ├── tests/
-│   ├── unit/                   # 单元测试与契约守卫（合成数据）
-│   └── integration/            # 集成与回归测试
-├── config/                     # pipeline.yaml + 各模块独立 YAML
+│   ├── unit/                   # 单元测试与契约守卫（合成数据，不需要数据集）
+│   └── integration/            # 数据集评测回归（需本地数据与 manifest）
+├── config/                     # pipeline.yaml（阶段开关与顺序）+ 各模块独立参数 YAML
 ├── .github/workflows/          # CI：单元/契约/集成三 job 回归流水线
 ├── .streamlit/config.toml      # Streamlit 主题映射
-├── data/
-│   ├── input/                  # 输入素材（CelebAMask-HQ 子集等）
-│   └── output/                 # 处理结果图
-├── results/                    # 评测数据（指标 CSV）与结论
-├── report/                     # 课程设计报告
+├── assets/
+│   ├── canvas.png              # 项目总览封面图（README 顶部引用）
+│   ├── test-images/            # 课程统一提供的标准测试图集（50 张）
+│   ├── evaluation_manifest.csv # 固定评测样本清单（sample_id,scene）
+│   └── metrics_template.csv    # 指标汇总模板
+├── data/                       # 不入版本管理（.gitignore 排除）
+│   ├── input/                  # 输入素材：CelebAMask-HQ 原始数据与 subset/ 抽样子集
+│   └── output/                 # 处理结果图（按 run_id 分目录）
+├── results/                    # 评测数据（指标 CSV）与结论，不入版本管理
+├── report/                     # 课程设计报告（figures/ 为图表素材）
 ├── slides/                     # 答辩 PPT
 ├── .gitignore
 └── README.md
@@ -131,11 +140,12 @@ BeautyCam/
 
 ### 最终选定
 
-主数据集为 CelebAMask-HQ，理由：
+主数据集为 CelebAMask-HQ。选型的核心逻辑：本课题是纯传统图像处理、不训练任何模型，对数据集的要求不是"量大"，而是"有没有皮肤区域的标准答案"。CelebAMask-HQ 是候选中唯一同时满足"高分辨率 + 自带皮肤掩码 + 公开可获取"三个条件的选项，理由：
 
 - 自带 19 类语义掩码，其中索引 1 即皮肤区域，可直接作为肤色检测的标准答案（GT），用于限定磨皮作用域并量化肤色检测准确率；
 - 1024x1024 高分辨率，便于观察磨皮与细节增强效果；
-- 覆盖多年龄、多肤色、多光照与遮挡场景，便于鲁棒性验证。
+- 覆盖多年龄、多肤色、多光照与遮挡场景，便于鲁棒性验证；
+- 效果可验证："肤色保护"这一目标由此可以量化为 IoU / 准确率 / 召回率，验收不靠主观印象。
 
 授权仅限非商业研究/教学用途，不纳入版本管理（见 `.gitignore`），获取方式与标签说明见 `data/input/README.md`。
 
