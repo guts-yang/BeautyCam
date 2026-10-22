@@ -134,31 +134,44 @@ def _ellipse(shape, values):
 def _gmm_model(pixels: np.ndarray, iterations: int) -> np.ndarray:
     """确定性 Lloyd 初始化；模型的 5/65 布局是 OpenCV GrabCut 的固定格式。
 
-    不调用 kmeans++ 或全局 RNG。1/12 为单位量化误差的方差，保证协方差正定。
-    模型完全由当前输入像素估计，不加载任何预训练参数。
+    重复的 BGR 值按出现次数加权，不降低颜色精度；保留原像素顺序的初始
+    亮度分位点。不调用 kmeans++ 或全局 RNG。1/12 为单位量化误差的方差，
+    保证协方差正定。模型完全由当前输入像素估计，不加载任何预训练参数。
     """
-    data = pixels.astype(np.float64)
-    order = np.argsort(data.mean(axis=1), kind="stable")
-    indices = np.rint(np.linspace(0, len(data) - 1, 5)).astype(int)
-    means = data[order[indices]].copy()
+    order = np.argsort(pixels.sum(axis=1, dtype=np.uint16), kind="stable")
+    indices = np.rint(np.linspace(0, len(pixels) - 1, 5)).astype(int)
+    means = pixels[order[indices]].astype(np.float64)
+    packed = ((pixels[:, 0].astype(np.uint32) << 16)
+              | (pixels[:, 1].astype(np.uint32) << 8) | pixels[:, 2])
+    colors, counts = np.unique(packed, return_counts=True)
+    data = np.column_stack((colors >> 16, (colors >> 8) & 255, colors & 255)).astype(np.float64)
+    weights = counts.astype(np.float64)
     previous = None
     for _ in range(iterations):
-        labels = np.argmin(np.sum((data[:, None, :] - means[None, :, :])**2, axis=2), axis=1)
+        # 分通道累加，避免 N×5×3 的距离临时数组及重复扫描各簇像素。
+        distance = np.square(data[:, None, 0] - means[None, :, 0])
+        distance += np.square(data[:, None, 1] - means[None, :, 1])
+        distance += np.square(data[:, None, 2] - means[None, :, 2])
+        labels = np.argmin(distance, axis=1)
         if previous is not None and np.array_equal(labels, previous):
             break
         previous = labels.copy()
-        for index in range(5):
-            if np.any(labels == index):
-                means[index] = data[labels == index].mean(axis=0)
+        totals = np.bincount(labels, weights=weights, minlength=5)
+        active = totals != 0
+        for channel in range(3):
+            sums = np.bincount(labels, weights=weights * data[:, channel], minlength=5)
+            means[active, channel] = sums[active] / totals[active]
     model = np.zeros(65, np.float64)
     for index in range(5):
-        group = data[labels == index]
-        if not len(group):
+        selected = labels == index
+        if not np.any(selected):
             continue
-        center = group.mean(axis=0)
+        group, weight = data[selected], weights[selected]
+        total = weight.sum()
+        center = (group * weight[:, None]).sum(axis=0) / total
         delta = group - center
-        covariance = delta.T @ delta / len(group) + np.eye(3) / 12
-        model[index] = len(group) / len(data)
+        covariance = np.einsum("ni,nj,n->ij", delta, delta, weight, optimize=False) / total + np.eye(3) / 12
+        model[index] = total / len(pixels)
         model[5 + 3 * index:8 + 3 * index] = center
         model[20 + 9 * index:29 + 9 * index] = covariance.ravel()
     return model[None, :]

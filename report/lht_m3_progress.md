@@ -4,6 +4,8 @@
 关联任务：[#21 M3 实现](https://github.com/guts-yang/BeautyCam/issues/21)、[#22 M3 测试与图表](https://github.com/guts-yang/BeautyCam/issues/22)
 状态：算法、单测和 40 张隔离定量评测完成；两名非实现者的人工检查待完成。
 
+当前交付与远程PR状态统一见 [B验收清单](lht_acceptance.md)。后面的测试数量、探索结论均是对应阶段历史记录；最新本地回归为254 passed，PR #52已建立。
+
 本页保留 M3 完成时的记录。后续 [M1](lht_m1_final.md)、[M2](lht_m2_progress.md)、[M4](lht_m4_progress.md) 已补齐本地实现与定量评测，当前人工验收状态仍以本页空表说明为准。
 
 ## 本轮结果
@@ -75,7 +77,7 @@ M3 已从占位函数替换为实际算法。沿用原有 config/smooth.yaml，�
 
 因此当前使用 Refs #21、Refs #22，不使用 Closes。正式签收需保留两人的评价记录。
 
-## M1 优化探索的结论
+## M1 优化探索的历史记录（已被正式实现替代）
 
 本轮另在同一批图像缩小到 512×512 后比较了 56 个开发变体，包含颜色椭圆、自动亮度阈值、色度阈值与最大连通域。开发探索与上轮 1024×1024 正式基线分开记录。
 
@@ -87,4 +89,4 @@ M3 已从占位函数替换为实际算法。沿用原有 config/smooth.yaml，�
 
 没有把这些探索替换进生产 M1，也未用 GT 裁剪预测。M1 的正式结果仍是上轮 IoU 0.446276、Recall 0.961867，#17/#18 尚待验收。实验脚本在工作区上一级 tmp/experiment_m1_refinement.py，统计在 results/m1_refinement_experiments.json。
 
-当前整体状态：M1 已实现但 IoU 待提高；M3 定量达标、人工检查待完成；M2、M4 待后续开发。M2 的 CLAHE 参数和 M1 新空间约束如需扩展 schema，仍按已冻结契约与 A 对齐。
+以上为M3完成时的阶段记录。M1后续已定量达标，M2已接入CLAHE，M4已定量达标，四模块均已提交PR #52；B自有配置按用户授权更新，无待确认的CLAHE配置提案。当前余项见页首验收清单。

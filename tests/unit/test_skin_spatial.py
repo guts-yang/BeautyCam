@@ -111,6 +111,54 @@ def test_gmm_models_are_finite_positive_definite_and_input_only():
     np.testing.assert_array_equal(model, skin_detect._gmm_model(pixels, 5))
 
 
+def _expanded_pixel_gmm(pixels, iterations):
+    """逐像素参考，用于验证颜色计数加权保留 Lloyd 拟合的数值结果。"""
+    data = pixels.astype(np.float64)
+    order = np.argsort(data.mean(axis=1), kind="stable")
+    means = data[order[np.rint(np.linspace(0, len(data) - 1, 5)).astype(int)]].copy()
+    previous = None
+    for _ in range(iterations):
+        labels = np.argmin(np.sum((data[:, None, :] - means[None, :, :])**2, axis=2), axis=1)
+        if previous is not None and np.array_equal(labels, previous):
+            break
+        previous = labels.copy()
+        for k in range(5):
+            if np.any(labels == k):
+                means[k] = data[labels == k].mean(axis=0)
+    model = np.zeros((1, 65), np.float64)
+    for k in range(5):
+        group = data[labels == k]
+        if len(group):
+            center = group.mean(axis=0)
+            delta = group - center
+            model[0, k] = len(group) / len(data)
+            model[0, 5 + 3*k:8 + 3*k] = center
+            model[0, 20 + 9*k:29 + 9*k] = (delta.T @ delta / len(group) + np.eye(3)/12).ravel()
+    return model
+
+
+@pytest.mark.parametrize("iterations", [1, 3, 10])
+@pytest.mark.parametrize("case", ["repeated", "gray", "unique", "ties", "single"])
+def test_weighted_gmm_matches_expanded_pixels_including_quantile_ties(case, iterations):
+    rng = np.random.default_rng(47)
+    if case == "repeated":
+        palette = rng.integers(0, 256, (40, 3), dtype=np.uint8)
+        pixels = np.repeat(palette, rng.integers(1, 30, len(palette)), axis=0)
+    elif case == "gray":
+        gray = rng.integers(0, 256, (800, 1), dtype=np.uint8)
+        pixels = np.repeat(gray, 3, axis=1)
+    elif case == "ties":
+        pixels = np.tile(np.array([[0, 128, 255], [255, 128, 0], [128, 0, 255]], np.uint8), (100, 1))
+    elif case == "single":
+        pixels = np.array([[255, 0, 255]], np.uint8)
+    else:
+        pixels = rng.integers(0, 256, (1000, 3), dtype=np.uint8)
+    pixels = np.repeat(pixels, 2, axis=0)[::2]  # 非连续只读视图也应成立。
+    pixels.setflags(write=False)
+    np.testing.assert_allclose(skin_detect._gmm_model(pixels, iterations),
+                               _expanded_pixel_gmm(pixels, iterations), rtol=1e-12, atol=2e-10)
+
+
 @pytest.mark.parametrize("spatial", [
     None, {"enabled": "true"}, {"enabled": True, "center": [0.5]},
     {"enabled": True, "roi_radius": [0, 0.4]},
