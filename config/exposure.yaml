@@ -2,15 +2,22 @@
 # exposure.yaml —— M2 曝光改善参数（owner: B）
 # 验收基线：欠曝样本皮肤区平均 Y 相对提升 ≥15%，处理后 Y>250 比例 ≤1%。
 
-# 目标肤色亮度与提升上限
+# 目标肤色亮度；gain 为向目标靠拢的比例 [0,1]，max_gain 为亮度倍率上限
 target_y: 150
 gain: 0.3
 max_gain: 1.5
 
-# 过曝保护
+# 过曝保护：在实际输出 BGR 的 Y 上检查；输入已超预算时安全跳过
 overexposure_y: 250
 overexposure_ratio_limit: 0.01
 
-# 曲线方式：gamma / linear
+# CLAHE 后的曲线方式：gamma / linear
 method: gamma
+# 自适应 gamma 指数的乘数；1.0 为无额外修正，linear 不使用此项
 gamma: 1.0
+
+# 局部对比度增强；关闭或缺少此块时兼容原曲线
+clahe:
+  enabled: true
+  clip_limit: 2.0
+  tile_grid_size: [8, 8]
