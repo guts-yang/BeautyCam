@@ -2,7 +2,7 @@
 
 python tools/evaluate_m2.py --data-root data/input/subset
 仅对输入皮肤 GT 平均 Y < 90 的真实欠曝样本判定提亮阈值。
-现有 gamma/linear 分支不等于完成 Issue #19 的 CLAHE 要求。
+记录本次 CLAHE 开关和曲线方式，区别本地算法验收与远程 PR/CI。
 """
 from __future__ import annotations
 
@@ -151,9 +151,18 @@ def evaluate(data_root, manifest, cfg, output):
     under = [row for row in valid if row["underexposed"]]
     invalid_count = len(records) - len(valid)
     passed = bool(under) and invalid_count == 0
+    clahe_enabled = bool(cfg.get("clahe", {}).get("enabled", False))
+    method = cfg.get("method", "gamma")
+    quantitative = {
+        "underexposed_gain": passed and all(row["relative_gain"] >= 0.15 for row in under),
+        "underexposed_overexposure": passed and all(row["overexposure_after_ratio"] <= 0.01 for row in under)}
+    algorithm_ready = clahe_enabled and method == "gamma"
+    local_acceptance = algorithm_ready and all(quantitative.values())
     summary = {
         "profile": "module_isolated", "target_module": "exposure", "mask_source": "skin_gt",
-        "implementation_scope": "adaptive gamma/linear only; CLAHE schema change pending",
+        "implementation_scope": (f"CLAHE plus adaptive {method}" if clahe_enabled else
+                                 f"adaptive {method}; CLAHE disabled for this run"),
+        "clahe_enabled": clahe_enabled,
         "config": cfg, "total_samples": len(records), "valid_samples": len(valid),
         "invalid_samples": invalid_count,
         "underexposed_sample_ids": [row["sample_id"] for row in under],
@@ -165,11 +174,13 @@ def evaluate(data_root, manifest, cfg, output):
                                        if row["overexposure_before_ratio"] > 0.01],
         "output_overexposure_exceedance_ids": [row["sample_id"] for row in valid
                                               if row["overexposure_after_ratio"] > 0.01],
-        "quantitative_acceptance": {
-            "underexposed_gain": passed and all(row["relative_gain"] >= 0.15 for row in under),
-            "underexposed_overexposure": passed and all(row["overexposure_after_ratio"] <= 0.01 for row in under)},
+        "quantitative_acceptance": quantitative,
+        "algorithm_requirements_met": algorithm_ready,
+        "local_acceptance": local_acceptance,
         "full_issue_19_acceptance": False,
-        "full_issue_19_pending_reason": "CLAHE plus adaptive gamma not yet implemented; schema review required",
+        "full_issue_19_pending_reason": (
+            "local algorithm and fixed-set quantitative checks complete; remote PR review and CI pending"
+            if local_acceptance else "this run does not meet all CLAHE+gamma and quantitative requirements"),
         "protocol": {"underexposed_input_mean_y_lt": 90, "overexposed_output_y_gt": 250,
                      "overexposure_ratio_limit": 0.01, "relative_gain_min": 0.15,
                      "gt_resize": "nearest", "same_region_for_all_statistics": True,
@@ -192,7 +203,8 @@ def evaluate(data_root, manifest, cfg, output):
         "仅输入皮肤 GT 平均 Y<90 的真实样本参与欠曝验收，不用 scene 占位值筛选。"
         "samples.csv 保留全部样本；histograms.csv 保存 256 个亮度桶的前后原始计数。"
         "无欠曝样本或存在无效 GT 时不得宣称定量通过。\n\n"
-        "当前实现仅包含自适应 gamma/linear；即使定量通过，也没有完成 #19 的 CLAHE 要求。\n",
+        f"本次 CLAHE {'开启' if clahe_enabled else '关闭'}，曲线为 {method}。"
+        "local_acceptance 只表示本地算法与该固定集定量项；远程 PR/CI 独立完成。\n",
         encoding="utf-8")
     return summary
 
@@ -204,9 +216,13 @@ def main(argv=None):
     parser.add_argument("--data-root", type=Path, default=repo / "data/input/subset")
     parser.add_argument("--manifest", type=Path, default=repo / "assets/evaluation_manifest.csv")
     parser.add_argument("--config", type=Path, default=repo / "config/exposure.yaml")
+    parser.add_argument("--clahe", action=argparse.BooleanOptionalAction, default=None,
+                        help="仅覆盖本次 CLAHE 开关；--no-clahe 用于同集消融，不回写 YAML")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args(argv)
     cfg = yaml.safe_load(args.config.read_text(encoding="utf-8"))
+    if args.clahe is not None:
+        cfg["clahe"] = {**cfg.get("clahe", {}), "enabled": args.clahe}
     output = args.output or repo / "results" / ("m2_" + datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
                                                + "_" + uuid.uuid4().hex[:6])
     summary = evaluate(args.data_root, args.manifest, cfg, output)
@@ -214,6 +230,7 @@ def main(argv=None):
                       "underexposed_relative_gain": summary["underexposed_relative_gain"],
                       "underexposed_after_overexposure": summary["underexposed_after_overexposure"],
                       "quantitative_acceptance": summary["quantitative_acceptance"],
+                      "local_acceptance": summary["local_acceptance"],
                       "full_issue_19_acceptance": summary["full_issue_19_acceptance"]},
                      ensure_ascii=False, indent=2))
     # 退出码只表示定量结果，不能作为整个 Issue 已完成的凭据。

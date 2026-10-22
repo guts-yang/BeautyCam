@@ -11,7 +11,13 @@ max_gain: 1.5
 overexposure_y: 250
 overexposure_ratio_limit: 0.01
 
-# 曲线方式：gamma / linear（CLAHE 配置待共同评审，不增加冻结 schema 键）
+# CLAHE 后的曲线方式：gamma / linear
 method: gamma
 # 自适应 gamma 指数的乘数；1.0 为无额外修正，linear 不使用此项
 gamma: 1.0
+
+# 局部对比度增强；关闭或缺少此块时兼容原曲线
+clahe:
+  enabled: true
+  clip_limit: 2.0
+  tile_grid_size: [8, 8]

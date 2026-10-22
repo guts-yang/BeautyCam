@@ -54,7 +54,7 @@ def test_explicit_noop_is_byte_exact(patch):
 def test_empty_mask_does_not_brighten_entire_image(mask_kind):
     image = _image()
     mask = None if mask_kind == "none" else np.zeros(image.shape[:2], np.uint8)
-    np.testing.assert_array_equal(exposure.process(image, mask, {}), image)
+    np.testing.assert_array_equal(exposure.process(image, mask, {"clahe": {"enabled": True}}), image)
 
 
 def test_readonly_strided_arrays_and_config_stay_unchanged():
@@ -75,12 +75,14 @@ def test_readonly_strided_arrays_and_config_stay_unchanged():
 
 
 @pytest.mark.parametrize("method", ["gamma", "linear"])
-def test_overexposure_guard_checks_final_bgr_luminance(method):
+@pytest.mark.parametrize("use_clahe", [False, True])
+def test_overexposure_guard_checks_final_bgr_luminance(method, use_clahe):
     image = _image(70, (20, 20))
     image[0, :8] = 250
     mask = _mask(image)
-    loose = exposure.process(image, mask, {"method": method, "gain": 1, "overexposure_ratio_limit": 1})
-    strict = exposure.process(image, mask, {"method": method, "gain": 1, "overexposure_ratio_limit": 0})
+    cfg = {"method": method, "gain": 1, "clahe": {"enabled": use_clahe}}
+    loose = exposure.process(image, mask, {**cfg, "overexposure_ratio_limit": 1})
+    strict = exposure.process(image, mask, {**cfg, "overexposure_ratio_limit": 0})
     loose_y = cv2.cvtColor(loose, cv2.COLOR_BGR2YCrCb)[:, :, 0]
     strict_y = cv2.cvtColor(strict, cv2.COLOR_BGR2YCrCb)[:, :, 0]
     assert np.mean(loose_y > 250) > 0
@@ -92,7 +94,7 @@ def test_overexposure_guard_checks_final_bgr_luminance(method):
 def test_preexisting_overexposure_is_not_hidden():
     image = _image()
     image[0, :16] = 255
-    np.testing.assert_array_equal(exposure.process(image, _mask(image), {}), image)
+    np.testing.assert_array_equal(exposure.process(image, _mask(image), {"clahe": {"enabled": True}}), image)
 
 
 @pytest.mark.parametrize("shape", [(1, 1), (1, 7), (7, 1)])
@@ -133,3 +135,73 @@ def test_bad_images(image):
 def test_bad_masks(mask):
     with pytest.raises(ValueError, match="skin_mask"):
         exposure.process(_image(), mask, {})
+
+
+@pytest.mark.parametrize("method", ["gamma", "linear"])
+def test_clahe_missing_or_disabled_preserves_legacy_curve_byte_exactly(method):
+    rng = np.random.default_rng(7)
+    image = rng.integers(15, 110, (32, 40, 3), dtype=np.uint8)
+    mask = _mask(image)
+    cfg = {"method": method, "gain": 0.3}
+    missing = exposure.process(image, mask, cfg)
+    disabled = exposure.process(image, mask, {**cfg, "clahe": {
+        "enabled": False, "clip_limit": 8.0, "tile_grid_size": [2, 2]}})
+    np.testing.assert_array_equal(missing, disabled)
+
+
+def _textured_image():
+    y, x = np.mgrid[:96, :128]
+    gray = (55 + x // 4 + ((x // 4 + y // 4) % 2) * 5).astype(np.uint8)
+    return np.repeat(gray[:, :, None], 3, axis=2)
+
+
+def test_clahe_increases_contrast_on_low_contrast_texture_and_parameters_work():
+    image = _textured_image()
+    mask = _mask(image)
+    plain = exposure.process(image, mask, {})
+    mild = exposure.process(image, mask, {"clahe": {"enabled": True, "clip_limit": 2, "tile_grid_size": [8, 8]}})
+    strong = exposure.process(image, mask, {"clahe": {"enabled": True, "clip_limit": 8, "tile_grid_size": [8, 8]}})
+    other_grid = exposure.process(image, mask, {"clahe": {"enabled": True, "clip_limit": 2, "tile_grid_size": [2, 2]}})
+    contrast = lambda value: float(cv2.cvtColor(value, cv2.COLOR_BGR2YCrCb)[:, :, 0].std())
+    assert contrast(mild) > contrast(plain)
+    assert contrast(strong) > contrast(mild)
+    assert not np.array_equal(mild, other_grid)
+    assert np.all(cv2.cvtColor(strong, cv2.COLOR_BGR2YCrCb)[:, :, 0] <= 250)
+
+
+def test_clahe_preserves_partial_mask_readonly_inputs_and_nested_configuration():
+    image = _textured_image()[:, ::2]
+    mask = np.zeros(image.shape[:2], np.uint8)
+    mask[12:84, 8:56] = 255
+    cfg = {"clahe": {"enabled": True, "clip_limit": 2, "tile_grid_size": [4, 4]}}
+    original_cfg = deepcopy(cfg)
+    original, original_mask = image.copy(), mask.copy()
+    image.setflags(write=False)
+    mask.setflags(write=False)
+    result = exposure.process(image, mask, cfg)
+    np.testing.assert_array_equal(image, original)
+    np.testing.assert_array_equal(mask, original_mask)
+    np.testing.assert_array_equal(result[mask == 0], image[mask == 0])
+    assert np.any(result[mask != 0] != image[mask != 0])
+    assert cfg == original_cfg
+
+
+@pytest.mark.parametrize("shape", [(1, 1), (1, 7), (7, 1), (2, 3)])
+def test_clahe_tiny_images_and_oversized_grid_remain_safe(shape):
+    y = np.arange(np.prod(shape), dtype=np.uint8).reshape(shape) + 40
+    image = np.repeat(y[:, :, None], 3, axis=2)
+    result = exposure.process(image, _mask(image), {"clahe": {
+        "enabled": True, "clip_limit": 1e308, "tile_grid_size": [2**60, 2**60]}})
+    assert result.shape == image.shape and result.dtype == np.uint8
+    np.testing.assert_array_equal(image[:, :, 0], y)
+
+
+@pytest.mark.parametrize("clahe", [
+    None, [], {"enabled": "true"}, {"clip_limit": 0}, {"clip_limit": float("inf")},
+    {"clip_limit": 2**2000}, {"tile_grid_size": [0, 8]}, {"tile_grid_size": [8]},
+    {"tile_grid_size": [True, 8]}, {"tile_grid_size": [2.5, 8]},
+])
+def test_invalid_clahe_configuration_has_key_path(clahe):
+    image = _image()
+    with pytest.raises(ValueError, match="exposure[.]clahe"):
+        exposure.process(image, _mask(image), {"clahe": clahe})

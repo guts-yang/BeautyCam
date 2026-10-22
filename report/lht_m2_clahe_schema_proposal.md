@@ -1,53 +1,34 @@
-# M2 CLAHE 配置变更建议（待共同评审）
+# M2 CLAHE 配置扩展记录（已授权接入）
 
 日期：2026-10-22
 关联任务：#19、#20
-状态：本地提案；尚未发布远程 change-request，也未修改生效配置的 schema。
+状态：用户明确授权 B 自主修改本模块与配置，CLAHE 已接入并完成本地验证，不再等待配置确认。
 
-用户反馈（2026-10-22）：组长尚未确认，先保留提案；本次不接入 CLAHE 或新增生效配置键。
+## 授权与范围
 
-## 原因与现有约束
+最初按 arch.md 7.1 的 schema 评审约定保留提案；用户先回复“尚未确认，先保留提案”，随后明确指出本模块完全归本人负责，可自行调整。本轮遵照这次最新授权执行，没有冒称已经获得组长共同评审。
 
-[#19](https://github.com/guts-yang/BeautyCam/issues/19) 要求“CLAHE + 自适应伽马”；当前 config/exposure.yaml 只提供 gamma / linear 和目标亮度、提升强度、过曝预算，没有 CLAHE 的裁剪限制或网格尺寸。
-
-[arch.md 7.1](../docs/baseline/arch.md) 明确规定：“可调阈值、强度、核大小、色温等不得硬编码。”以及“改 schema、接口或跨模块语义时须走 change-request。”
-
-因此没有把 CLAHE 的 clipLimit / tileGridSize 藏成源码常量，也没有把 gamma / gain 等现有键重解释成 CLAHE 参数。当前已完成可独立运行的自适应 gamma / linear 分支，CLAHE 部分待确认以下扩展。
-
-## 建议的最小 YAML 增量
-
-仅在 B 负责的 config/exposure.yaml 末尾增加：
+只扩展 B 负责的 exposure.yaml：
 
 ```yaml
-# 局部对比度增强；method 仍只表示后续 gamma / linear 曲线
 clahe:
   enabled: true
   clip_limit: 2.0
   tile_grid_size: [8, 8]
 ```
 
-| 键 | 类型/范围 | 含义 |
-| --- | --- | --- |
-| clahe.enabled | bool | 是否在曲线前执行 CLAHE |
-| clahe.clip_limit | 有限正数 | OpenCV CLAHE 直方图裁剪限制 |
-| clahe.tile_grid_size | 长度为 2 的正整数序列 | 横向/纵向网格数，不是单个格子的像素尺寸 |
+接口、其他成员文件、依赖和评分标准均保持原样。没有发布远程 change-request，也没有改写公共架构文档。
 
-上述初始值是待实测的候选，不是已经证明的最终参数。OpenCV 参数定义参考：[CLAHE 4.10 官方文档](https://docs.opencv.org/4.10.0/d6/db6/classcv_1_1CLAHE.html)。
+## 已落地行为
 
-## 接入行为
+- CLAHE 在 Y 亮度上执行，按已有 gain 混合，然后进入自适应 gamma 或 linear 曲线。
+- 只回写皮肤掩码内；保留 max_gain 与实际 BGR 过曝预算保护。
+- 块缺失或 enabled=false 时兼容旧版曲线，40 张真实输出已逐像素验证。
+- enabled 为布尔值，clip_limit 为有限正数，tile_grid_size 为两个正整数；非法配置给出具体键路径。
+- 细节、测试和材料见 [M2 开发报告](lht_m2_progress.md)。
 
-- 冻结的 process(image_bgr, skin_mask, cfg) 签名和 BGR uint8 返回值不变。
-- method 保持 gamma / linear；不添加 pipeline 开关，不修改 A、C 文件或公共依赖。
-- 在 Y 亮度上先做 CLAHE，以现有 gain 混合局部对比度结果，再用自适应曲线靠近目标；只回写皮肤掩码内。
-- 继续用 max_gain 限制提升，并在实际输出 BGR 重算 Y 后检查过曝预算。
-- 整个 clahe 块缺失或 enabled=false 时，逐字节复现现有 gamma / linear 分支，以兼容旧配置。
-- 不改变 PRD 的欠曝定义、GT 区域、评分阈值或固定 40 张清单。
+## 验证结果
 
-## 确认后需要完成的验证
+214 项非集成测试通过；固定 40 张的唯一真实欠曝样本提亮 20.5038%，输出 Y>250 比例为 0%。关闭对照提亮 19.9405%。本地算法与该固定集门槛通过，远程 PR、CI 与合并尚未完成。
 
-1. 增加开关关闭的兼容测试、CLAHE 局部对比度实际变化测试、网格/裁剪参数生效与非法参数测试。
-2. 重跑非集成回归及相同 40 张隔离评测；保留关闭/开启两组逐图分数、直方图和输入不变性检查。
-3. 如候选参数导致提亮或过曝指标失败，只调整 B 的上述参数，不能放宽评分标准或剔除样本。
-4. 全部材料通过后才将 #19 标为实现完成；PR 由 A 统一评审与合并。
-
-现有 40 张里仅 1 张属于真实欠曝。若后续补充样本，须先固定、审阅新清单并单独报告，不能把合成暗化结果混入本轮真实欠曝成绩。
+参数定义参考：[OpenCV 4.10 CLAHE](https://docs.opencv.org/4.10.0/d6/db6/classcv_1_1CLAHE.html)。

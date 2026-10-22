@@ -109,4 +109,4 @@ OpenCV 算法接口参考：[GrabCut 官方文档](https://docs.opencv.org/4.10.
 
 本地验证 Python 3.12.8、OpenCV 4.10.0、NumPy 1.26.4；Python 3.10 和远程 CI 尚未在本轮验证。
 
-未修改正式 M1 源码、config/skin_detect.yaml、A/C 源码、公共接口、依赖或评分阈值。#17/#18 仍使用 Refs，不使用 Closes。CLAHE 继续遵照用户反馈保留提案，待组长确认。
+未修改正式 M1 源码、config/skin_detect.yaml、A/C 源码、公共接口、依赖或评分阈值。#17/#18 仍使用 Refs，不使用 Closes。后续用户已授权 B 自主扩展并接入 CLAHE，最新状态见 [M2 报告](lht_m2_progress.md)。

@@ -1,17 +1,29 @@
 # -*- coding: utf-8 -*-
-"""M2：冻结配置内的自适应 gamma / linear 曝光改善（owner: B）。
+"""M2：CLAHE + 自适应 gamma / linear 曝光改善（owner: B）。
 
 只在传入皮肤掩码内提升 Y，保留色度；不修改输入、不读写文件。
-CLAHE 尚未接入：其参数不在冻结 schema 内，变更建议见 report/。
+CLAHE 参数来自 cfg.clahe；缺少该块或 enabled=false 时兼容旧曲线。
 """
 from __future__ import annotations
 
 from collections.abc import Mapping
-from numbers import Real
+from numbers import Integral, Real
 from typing import Any
 
 import cv2
 import numpy as np
+
+
+def _number(value: Any, key: str) -> float:
+    if isinstance(value, (bool, np.bool_)) or not isinstance(value, Real):
+        raise ValueError(f"exposure.{key} 必须为有限数值")
+    try:
+        result = float(value)
+    except (OverflowError, ValueError):
+        raise ValueError(f"exposure.{key} 必须为有限数值") from None
+    if not np.isfinite(result):
+        raise ValueError(f"exposure.{key} 必须为有限数值")
+    return result
 
 
 def _configuration(cfg: Mapping[str, Any]) -> dict[str, Any]:
@@ -23,20 +35,33 @@ def _configuration(cfg: Mapping[str, Any]) -> dict[str, Any]:
         ("max_gain", 1.5, 1, 255), ("overexposure_y", 250, 0, 255),
         ("overexposure_ratio_limit", 0.01, 0, 1),
     ):
-        value = cfg.get(key, default)
-        if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
-                or not np.isfinite(value) or not lower <= value <= upper):
+        value = _number(cfg.get(key, default), key)
+        if not lower <= value <= upper:
             raise ValueError(f"exposure.{key} 必须为 [{lower}, {upper}] 内的有限数值")
         values[key] = float(value)
-    gamma = cfg.get("gamma", 1.0)
-    if (isinstance(gamma, (bool, np.bool_)) or not isinstance(gamma, Real)
-            or not np.isfinite(gamma) or gamma <= 0):
+    gamma = _number(cfg.get("gamma", 1.0), "gamma")
+    if gamma <= 0:
         raise ValueError("exposure.gamma 必须为有限正数")
     values["gamma"] = float(gamma)
     method = cfg.get("method", "gamma")
     if not isinstance(method, str) or method not in ("gamma", "linear"):
         raise ValueError("exposure.method 仅支持 gamma / linear")
     values["method"] = method
+    clahe = cfg.get("clahe", {})
+    if not isinstance(clahe, Mapping):
+        raise ValueError("exposure.clahe 必须为映射")
+    enabled = clahe.get("enabled", False)
+    if not isinstance(enabled, (bool, np.bool_)):
+        raise ValueError("exposure.clahe.enabled 必须为布尔值")
+    clip = _number(clahe.get("clip_limit", 2.0), "clahe.clip_limit")
+    if clip <= 0:
+        raise ValueError("exposure.clahe.clip_limit 必须为正数")
+    grid = clahe.get("tile_grid_size", [8, 8])
+    if (not isinstance(grid, (list, tuple)) or len(grid) != 2
+            or any(isinstance(v, (bool, np.bool_)) or not isinstance(v, Integral) or v < 1 for v in grid)):
+        raise ValueError("exposure.clahe.tile_grid_size 必须含两个正整数")
+    values["clahe"] = {"enabled": bool(enabled), "clip_limit": clip,
+                       "tile_grid_size": tuple(map(int, grid))}
     return values
 
 
@@ -58,6 +83,7 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
     """返回新的同尺寸 BGR uint8；空掩码和已足够明亮的皮肤安全跳过。
 
     desired = min(mean + gain*(target_y-mean), mean*max_gain)。
+    可选 CLAHE 先在亮度上增强，以既有 gain 混合，再进入曲线。
     gamma 曲线为 255*(Y/255)**exponent，其中 exponent 自适应目标均值，
     再乘 cfg.gamma（1 表示无额外修正）；linear 使用 desired/mean。
     逐像素提升也不超过 max_gain，纯黑不凭空生成细节。
@@ -80,7 +106,8 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
     region = skin_mask != 0
     if not np.any(region) or settings["gain"] == 0 or settings["max_gain"] == 1:
         return result
-    colors = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)[region]
+    ycrcb_image = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
+    colors = ycrcb_image[region]
     y = colors[:, 0].astype(np.float64)
     mean = float(np.mean(y))
     threshold, budget = settings["overexposure_y"], settings["overexposure_ratio_limit"]
@@ -89,13 +116,28 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
         return result
     desired = min(mean + settings["gain"] * (settings["target_y"] - mean),
                   mean * settings["max_gain"])
+    curve_y, curve_mean = y, mean
+    clahe = settings["clahe"]
+    luminance = ycrcb_image[:, :, 0]
+    if clahe["enabled"] and np.max(luminance) != np.min(luminance):
+        # 网格多于像素没有意义，按当前图尺寸收敛；避免极小图过度填充。
+        grid = (min(clahe["tile_grid_size"][0], image_bgr.shape[1]),
+                min(clahe["tile_grid_size"][1], image_bgr.shape[0]))
+        # 8-bit 共 256 个桶，clip_limit>=256 已等价于不裁剪，避免数值溢出。
+        clip = min(clahe["clip_limit"], np.iinfo(np.uint8).max + 1)
+        enhanced = cv2.createCLAHE(clipLimit=clip, tileGridSize=grid).apply(luminance)
+        curve_y = np.maximum(y, y + settings["gain"] * (enhanced[region].astype(np.float64) - y))
+        curve_mean = float(np.mean(curve_y))
     if settings["method"] == "linear":
-        mapped = y * (desired / mean)
+        mapped = curve_y * max(1.0, desired / curve_mean)
+    elif curve_mean >= 255:
+        mapped = curve_y
     else:
-        exponent = min(1.0, settings["gamma"] * np.log(desired / 255) / np.log(mean / 255))
+        adaptive_exponent = float(np.log(desired / 255) / np.log(curve_mean / 255))
+        exponent = min(1.0, settings["gamma"] * adaptive_exponent)
         # 正浮点数下溢时仍保留 0**positive == 0 的纯黑语义。
         exponent = max(exponent, np.finfo(np.float64).tiny)
-        mapped = 255 * (y / 255)**exponent
+        mapped = 255 * (curve_y / 255)**exponent
     mapped = np.minimum(np.maximum(mapped, y), np.minimum(y * settings["max_gain"], 255))
     original = image_bgr[region]
 

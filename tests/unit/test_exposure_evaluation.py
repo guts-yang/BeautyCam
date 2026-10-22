@@ -59,6 +59,7 @@ def test_evaluation_resizes_gt_saves_histograms_and_keeps_clahe_pending(tmp_path
     assert all(summary["quantitative_acceptance"].values())
     assert summary["underexposed_sample_ids"] == ["1"]
     assert summary["full_issue_19_acceptance"] is False
+    assert not summary["clahe_enabled"] and not summary["local_acceptance"]
     assert (out / "outputs/1.png").is_file() and (out / "figures/1.png").is_file()
     assert json.loads((out / "summary.json").read_text(encoding="utf-8")) == summary
     histogram = list(csv.DictReader((out / "histograms.csv").read_text().splitlines()))
@@ -67,6 +68,11 @@ def test_evaluation_resizes_gt_saves_histograms_and_keeps_clahe_pending(tmp_path
     assert sum(int(row["after_count"]) for row in histogram) == 96
     samples = list(csv.DictReader((out / "samples.csv").read_text().splitlines()))
     assert float(samples[0]["relative_gain"]) > 0.15
+    clahe = _tool.evaluate(root, manifest, {"clahe": {"enabled": True}}, tmp_path / "clahe")
+    assert clahe["clahe_enabled"] and clahe["algorithm_requirements_met"]
+    assert clahe["local_acceptance"]
+    assert clahe["full_issue_19_acceptance"] is False
+    assert "CI pending" in clahe["full_issue_19_pending_reason"]
     with pytest.raises(ValueError, match="输出目录"):
         _tool.evaluate(root, manifest, {}, out)
     (root / "skin_masks/1.png").unlink()
