@@ -4,6 +4,8 @@
 关联任务：[#21 M3 实现](https://github.com/guts-yang/BeautyCam/issues/21)、[#22 M3 测试与图表](https://github.com/guts-yang/BeautyCam/issues/22)
 状态：算法、单测和 40 张隔离定量评测完成；两名非实现者的人工检查待完成。
 
+本页保留 M3 完成时的记录。后续 [M1](lht_m1_final.md)、[M2](lht_m2_progress.md)、[M4](lht_m4_progress.md) 已补齐本地实现与定量评测，当前人工验收状态仍以本页空表说明为准。
+
 ## 本轮结果
 
 M3 已从占位函数替换为实际算法。沿用原有 config/smooth.yaml，不增加配置键，不修改公共接口，也不依赖 M1 或 C 的评价实现。

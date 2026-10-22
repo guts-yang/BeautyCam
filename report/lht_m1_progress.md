@@ -5,7 +5,7 @@
 起点：main@0b579fd55b5bdac7e008b85ddd1893e63f675147
 状态：实现与评测基线已建立；IoU 尚未达标，两个 Issue 均待完整验收。
 
-后续进展：[2026-10-22 M1 误检归因与空间试验](lht_m1_refinement_20261022.md)。本文保留首轮基线记录；M2/M3/M4 后续进展见各自 lht_m*_progress.md。
+后续进展：[M1 正式实现已通过本地定量验收](lht_m1_final.md)，另有 [2026-10-22 误检归因与空间试验](lht_m1_refinement_20261022.md)。本文保留首轮基线记录；M2/M3/M4 后续进展见各自 lht_m*_progress.md。
 
 ## 已完成
 

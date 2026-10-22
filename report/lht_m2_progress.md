@@ -97,4 +97,4 @@ CLAHE 参数定义参考：[OpenCV 4.10 官方文档](https://docs.opencv.org/4.
 
 本轮只修改 B 的源码、模块 YAML、对应测试、离线工具与报告。未修改 A 的 core/、io/、config/pipeline.yaml、requirements.txt、.github/ 或 C 的文件；没有新增依赖、文件读写型算法或模块间导入。
 
-M2 的 CLAHE 接入已完成，不再列为等待配置确认。B 板块余项为 M1 的 IoU 改进、M3/M4 的两名非实现者人工检查，以及后续 PR/CI 与统一联调。
+M2 的 CLAHE 接入已完成，不再列为等待配置确认。后续 [M1 正式实现](lht_m1_final.md) 也已通过本地定量门槛。余项为速度优化、M3/M4 的两名非实现者人工检查，以及远程 PR/CI 与统一联调；远程状态以当前 PR 为准。

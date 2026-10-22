@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # skin_detect.yaml —— M1 肤色检测参数（owner: B）
-# 数值为 v1.0 预设基线，试测后如需调整走 change-request。
+# B 自有参数：颜色候选 + 确定性图割共识；见 report/lht_m1_final.md。
 
 # 色彩空间判定阈值（YCrCb 经验区间，供实现参考）
 ycbcr:
@@ -14,3 +14,24 @@ postprocess:
   enabled: true
   morph_kernel: 5
   min_area_ratio: 0.001
+
+# 空间分割面向居中单人肖像；坐标、半径均相对整图宽高归一化。
+# 缺少此块或关闭时兼容原颜色阈值，不加载任何预训练模型。
+spatial:
+  enabled: true
+  center: [0.5, 0.48]
+  roi_radius: [0.4, 0.43]
+  seed_radius: [0.15, 0.2]
+  iterations: 3
+  gmm_iterations: 10
+  workers: 3
+  vote_threshold: 2
+  profiles:
+    - {space: gray, working_size: 256, trusted: false, bright_seed: false}
+    - {space: bgr, working_size: 512, trusted: true, bright_seed: false}
+    - {space: bgr, working_size: 512, trusted: true, bright_seed: true}
+  face_ellipse: [0.5, 0.52, 0.34, 0.4]
+  # 鼻、唇等独立语义区保护；所有样本统一使用同一组参数。
+  exclude_ellipses:
+    - [0.5, 0.55, 0.035, 0.1]
+    - [0.5, 0.62, 0.08, 0.04]

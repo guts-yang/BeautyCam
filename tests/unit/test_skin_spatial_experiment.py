@@ -24,7 +24,7 @@ def test_spatial_prediction_does_not_accept_gt_and_preserves_input():
     image[16:48, 16:48] = (80, 120, 180)
     image.setflags(write=False)
     original = image.copy()
-    cfg, options = {}, _options()
+    cfg, options = {"spatial": {"enabled": True, "profiles": []}}, _options()
     saved_cfg, saved_options = deepcopy(cfg), deepcopy(options)
     cv2.setRNGSeed(options["rng_seed"])
     first, status = _tool.spatial_prediction(image, cfg, options)

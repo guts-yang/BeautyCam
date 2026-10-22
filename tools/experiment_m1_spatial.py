@@ -30,6 +30,8 @@ def spatial_prediction(image, cfg, options):
                                 max(1, round(image.shape[0] * scale))), interpolation=cv2.INTER_AREA)
     color_cfg = deepcopy(cfg)
     color_cfg.setdefault("postprocess", {})["enabled"] = False
+    # 此工具的颜色候选必须绕过正式空间分割，避免配置扩展后嵌套图割。
+    color_cfg["spatial"] = {"enabled": False}
     color = skin_detect.detect_skin(working, color_cfg) != 0
     seed_cfg = deepcopy(color_cfg)
     if "seed_ycbcr" in options:

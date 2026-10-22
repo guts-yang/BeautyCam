@@ -4,6 +4,8 @@
 关联任务：[#17](https://github.com/guts-yang/BeautyCam/issues/17)、[#18](https://github.com/guts-yang/BeautyCam/issues/18)
 状态：完成本地误检诊断，空间候选仅供开发验证；正式 M1 算法和生效配置未替换，未完整验收。
 
+后续状态：正式模块现已接入确定性图割共识并通过本地定量项，见 [M1 最终报告](lht_m1_final.md)。本文保留该实现之前的研究记录。
+
 ## 先看结论
 
 当前正式 M1 的 40 张宏平均 IoU 仍为 0.446276，Recall 为 0.961867，Precision 为 0.462241。主要问题是误检多，不能仅靠追求高召回解决。
