@@ -4,6 +4,8 @@
 关联任务：#19、#20
 状态：本地提案；尚未发布远程 change-request，也未修改生效配置的 schema。
 
+用户反馈（2026-10-22）：组长尚未确认，先保留提案；本次不接入 CLAHE 或新增生效配置键。
+
 ## 原因与现有约束
 
 [#19](https://github.com/guts-yang/BeautyCam/issues/19) 要求“CLAHE + 自适应伽马”；当前 config/exposure.yaml 只提供 gamma / linear 和目标亮度、提升强度、过曝预算，没有 CLAHE 的裁剪限制或网格尺寸。
