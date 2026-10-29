@@ -62,6 +62,16 @@ def _configuration(cfg: Mapping[str, Any]) -> dict[str, Any]:
         raise ValueError("exposure.clahe.tile_grid_size 必须含两个正整数")
     values["clahe"] = {"enabled": bool(enabled), "clip_limit": clip,
                        "tile_grid_size": tuple(map(int, grid))}
+    blend = cfg.get("mask_blend", {})
+    if not isinstance(blend, Mapping):
+        raise ValueError("exposure.mask_blend 必须为映射")
+    radius = _number(blend.get("radius_ratio", 0.0), "mask_blend.radius_ratio")
+    compensation = _number(blend.get("max_compensation", 2.0), "mask_blend.max_compensation")
+    if not 0 <= radius <= 1:
+        raise ValueError("exposure.mask_blend.radius_ratio 必须为0..1")
+    if not 1 <= compensation <= 4:
+        raise ValueError("exposure.mask_blend.max_compensation 必须为1..4")
+    values["mask_blend"] = {"radius_ratio": radius, "max_compensation": compensation}
     return values
 
 
@@ -139,6 +149,19 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
         exponent = max(exponent, np.finfo(np.float64).tiny)
         mapped = 255 * (curve_y / 255)**exponent
     mapped = np.minimum(np.maximum(mapped, y), np.minimum(y * settings["max_gain"], 255))
+    blend = settings["mask_blend"]
+    if blend["radius_ratio"] > 0:
+        # 权重只在掩码内部向边缘衰减；掩码外仍逐像素保持输入。
+        radius = max(1.0, blend["radius_ratio"] * min(skin_mask.shape))
+        distance = cv2.distanceTransform(skin_mask, cv2.DIST_L2, 5)
+        weight = np.minimum(distance[region] / radius, 1.0).astype(np.float64)
+        weight = weight * weight * (3.0 - 2.0 * weight)
+        delta = (mapped - y) * weight
+        average = float(np.mean(delta))
+        # 适度补偿边缘渐变损失，保留提亮目标；窄碎片不无限补偿成硬边。
+        compensation = (min(blend["max_compensation"], max(1.0, (desired - mean) / average))
+                        if average > 0 else 1.0)
+        mapped = np.minimum(y + delta * compensation, np.minimum(y * settings["max_gain"], 255))
     original = image_bgr[region]
 
     def within_budget(pixels):

@@ -50,6 +50,47 @@ def test_explicit_noop_is_byte_exact(patch):
     assert not np.shares_memory(result, image)
 
 
+def test_mask_blend_removes_brightness_step_without_changing_outside():
+    image = _image(60, (128, 128))
+    mask = np.zeros((128, 128), np.uint8)
+    mask[20:108, 20:108] = 255
+    hard = exposure.process(image, mask, {})
+    soft = exposure.process(image, mask, {"mask_blend": {"radius_ratio": 0.1}})
+    hard_y = cv2.cvtColor(hard, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(float)
+    soft_y = cv2.cvtColor(soft, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(float)
+    assert hard_y[64, 20] - hard_y[64, 19] > 20
+    assert soft_y[64, 20] - soft_y[64, 19] <= 1
+    assert np.max(np.abs(np.diff(soft_y[64, 16:65]))) <= 5
+    assert soft_y[64, 64] > soft_y[64, 22] > soft_y[64, 20]
+    np.testing.assert_array_equal(soft[mask == 0], image[mask == 0])
+    assert _mean(soft[20:108, 20:108]) >= 80
+
+
+def test_mask_blend_does_not_restore_hard_step_on_narrow_fragment():
+    image = _image(60, (128, 128))
+    mask = np.zeros((128, 128), np.uint8)
+    mask[20:108, 63:66] = 255
+    result = exposure.process(image, mask, {"mask_blend": {"radius_ratio": 0.1}})
+    assert int(result[64, 63, 0]) - 60 <= 2
+
+
+def test_zero_blend_is_legacy_exact_and_full_mask_is_unchanged():
+    image = _image(60, (32, 32))
+    mask = _mask(image)
+    expected = exposure.process(image, mask, {})
+    np.testing.assert_array_equal(exposure.process(image, mask, {"mask_blend": {"radius_ratio": 0}}), expected)
+    np.testing.assert_array_equal(exposure.process(image, mask, {"mask_blend": {"radius_ratio": 0.03}}), expected)
+
+
+@pytest.mark.parametrize("blend", [None, {"radius_ratio": True}, {"radius_ratio": -0.1},
+                                  {"radius_ratio": float("inf")}, {"radius_ratio": 1.1},
+                                  {"max_compensation": 0.5}, {"max_compensation": 5}])
+def test_invalid_mask_blend_configuration_is_rejected(blend):
+    image = _image()
+    with pytest.raises(ValueError, match="exposure[.]mask_blend"):
+        exposure.process(image, _mask(image), {"mask_blend": blend})
+
+
 @pytest.mark.parametrize("mask_kind", ["none", "empty"])
 def test_empty_mask_does_not_brighten_entire_image(mask_kind):
     image = _image()

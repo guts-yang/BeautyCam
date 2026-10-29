@@ -98,6 +98,60 @@ def test_parallel_profiles_equal_serial_and_do_not_consume_rng():
     np.testing.assert_array_equal(cv2.randu(np.empty((8, 8), np.float32), 0, 1), expected)
 
 
+def test_coverage_recovery_retains_face_outside_old_final_ellipse():
+    image = np.full((96, 96, 3), (255, 0, 0), np.uint8)
+    image[15:78, 25:83] = (80, 120, 180)
+    cfg = _cfg()
+    cfg["spatial"].update(center=[0.5, 0.48], roi_radius=[0.47, 0.48],
+                           face_ellipse=[0.5, 0.52, 0.34, 0.4])
+    cfg["spatial"]["profiles"][0]["working_size"] = 96
+    clipped = skin_detect.detect_skin(image, cfg)
+    cfg["spatial"]["face_ellipse"] = None
+    cfg["spatial"]["coverage_recovery"] = {"enabled": True, "working_size": 96}
+    restored = skin_detect.detect_skin(image, cfg)
+    assert clipped[69, 78] == 0
+    assert restored[69, 78] == 255
+    assert not np.any(restored[:10])
+    assert not np.any(restored[:, :20])
+
+
+def test_recovery_recognizes_shadowed_skin_without_growing_into_blue_background():
+    image = np.full((128, 128, 3), (240, 20, 20), np.uint8)
+    shape = np.zeros((128, 128), np.uint8)
+    cv2.ellipse(shape, (64, 60), (34, 46), 0, 0, 360, 255, -1)
+    for row in range(128):
+        t = np.clip((row-40)/60, 0, 1)
+        image[row, shape[row] != 0] = np.rint((1-t)*np.array([80, 120, 180]) + t*np.array([40, 75, 115]))
+    image[119:128] = (40, 75, 115)  # ROI外也有同色区域，不能用于污染背景模型。
+    cfg = _cfg()
+    cfg["spatial"].update(center=[0.5, 0.4], roi_radius=[0.47, 0.53], seed_radius=[0.1, 0.1],
+                           coverage_recovery={"enabled": True, "working_size": 128})
+    cfg["spatial"]["profiles"][0]["working_size"] = 128
+    cfg["spatial"]["iterations"] = 3
+    cfg["spatial"]["gmm_iterations"] = 10
+    prediction = skin_detect.detect_skin(image, cfg)
+    assert prediction[97, 64] == 255
+    assert not np.any(prediction[:, :20])
+    assert not np.any(prediction[119:])
+
+
+def test_recovery_is_readonly_repeatable_serial_parallel_and_rng_isolated():
+    image = _scene()
+    image.setflags(write=False)
+    cfg = _cfg()
+    cfg["spatial"]["coverage_recovery"] = {"enabled": True, "working_size": 64}
+    original_cfg = deepcopy(cfg)
+    cv2.setRNGSeed(83)
+    expected = cv2.randu(np.empty((8, 8), np.float32), 0, 1)
+    cv2.setRNGSeed(83)
+    first = skin_detect.detect_skin(image, cfg)
+    np.testing.assert_array_equal(cv2.randu(np.empty((8, 8), np.float32), 0, 1), expected)
+    cfg["spatial"]["workers"] = 3
+    np.testing.assert_array_equal(first, skin_detect.detect_skin(image, cfg))
+    cfg["spatial"].pop("workers")
+    assert cfg == original_cfg
+
+
 def test_gmm_models_are_finite_positive_definite_and_input_only():
     pixels = np.array([[10, 30, 70], [50, 60, 80], [180, 160, 150]] * 5, np.uint8)
     pixels.setflags(write=False)
@@ -173,6 +227,13 @@ def test_weighted_gmm_matches_expanded_pixels_including_quantile_ties(case, iter
     {"enabled": True, "face_ellipse": [0.5, 0.5, -0.1, 0.4]},
     {"enabled": True, "exclude_ellipses": None},
     {"enabled": True, "center": [2**2000, 0.5]},
+    {"enabled": True, "coverage_recovery": None},
+    {"enabled": True, "coverage_recovery": {"enabled": "true"}},
+    {"enabled": True, "coverage_recovery": {"enabled": True, "working_size": 0}},
+    {"enabled": True, "coverage_recovery": {"lower_quantile": True}},
+    {"enabled": True, "coverage_recovery": {"lower_quantile": float("nan")}},
+    {"enabled": True, "coverage_recovery": {"horizontal_padding": -0.1}},
+    {"enabled": True, "coverage_recovery": {"enabled": True}, "profiles": [{"space": "gray"}]},
 ])
 def test_invalid_spatial_configuration_has_key_path(spatial):
     with pytest.raises(ValueError, match="skin_detect[.]spatial"):

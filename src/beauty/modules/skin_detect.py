@@ -118,10 +118,29 @@ def _spatial_configuration(cfg: Mapping[str, Any]) -> dict[str, Any] | None:
     if not isinstance(exclusions, (list, tuple)):
         raise ValueError("skin_detect.spatial.exclude_ellipses 必须为列表")
     exclusions = [vector(value, "exclude_ellipses", 4) for value in exclusions]
+    recovery = spatial.get("coverage_recovery", {})
+    if not isinstance(recovery, Mapping):
+        raise ValueError("skin_detect.spatial.coverage_recovery 必须为映射")
+    recover_enabled = recovery.get("enabled", False)
+    if not isinstance(recover_enabled, (bool, np.bool_)):
+        raise ValueError("skin_detect.spatial.coverage_recovery.enabled 必须为布尔值")
+    recover_size = _integer(recovery.get("working_size", 512),
+                            "spatial.coverage_recovery.working_size", 1, 2048)
+    recover_limits = {}
+    for key, default in (("lower_quantile", 0.55), ("horizontal_padding", 0.25)):
+        value = recovery.get(key, default)
+        if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+                or not np.isfinite(value) or not 0 <= value <= 1):
+            raise ValueError(f"skin_detect.spatial.coverage_recovery.{key} 必须为0..1有限值")
+        recover_limits[key] = float(value)
+    if recover_enabled and not any(p["space"] == "bgr" and p["trusted"] for p in parsed):
+        raise ValueError("skin_detect.spatial.coverage_recovery 需要可信BGR配置")
     return {"center": center, "roi_radius": roi, "seed_radius": seed,
             "iterations": iterations, "gmm_iterations": gmm_iterations, "workers": workers,
             "profiles": parsed, "vote_threshold": votes, "face_ellipse": face,
-            "exclude_ellipses": exclusions}
+            "exclude_ellipses": exclusions,
+            "coverage_recovery": {"enabled": bool(recover_enabled), "working_size": recover_size,
+                                  **recover_limits}}
 
 
 def _ellipse(shape, values):
@@ -194,6 +213,9 @@ def _spatial_profile(image, bounds, settings, profile):
     gray = cv2.cvtColor(working, cv2.COLOR_BGR2GRAY)
     if profile["trusted"]:
         foreground, background = seed.copy(), (~broad) | (~color)
+        if profile.get("non_skin_background", False):
+            # ROI之外仍可能是真实面颊/下巴；恢复分支不把这些肤色当成背景模型样本。
+            background = ~color
         if profile["bright_seed"] and np.any(foreground):
             threshold = cv2.threshold(gray[foreground].reshape(-1, 1), 0, 255,
                                       cv2.THRESH_BINARY | cv2.THRESH_OTSU)[0]
@@ -219,17 +241,40 @@ def _spatial_profile(image, bounds, settings, profile):
 def _spatial_mask(image, color_mask, bounds, settings):
     if not np.any(color_mask) or not np.any(image != image[0, 0]):
         return color_mask.copy()
-    votes = np.zeros(image.shape[:2], np.uint32)
     profiles = settings["profiles"]
-    if settings["workers"] == 1 or len(profiles) == 1:
-        for profile in profiles:
-            votes += _spatial_profile(image, bounds, settings, profile)
+    recovery = settings["coverage_recovery"]
+    replacements = [i for i, p in enumerate(profiles) if p["space"] == "bgr" and p["trusted"]]
+    tasks = list(profiles)
+    if recovery["enabled"]:
+        tasks += [dict(profiles[i], non_skin_background=True) for i in replacements]
+    if settings["workers"] == 1 or len(tasks) == 1:
+        predictions = [_spatial_profile(image, bounds, settings, profile) for profile in tasks]
     else:
         # 每路只读同一输入，持有自己的模型和标记；投票在主调用线程按序汇总。
-        with ThreadPoolExecutor(max_workers=min(settings["workers"], len(profiles))) as executor:
-            for prediction in executor.map(lambda p: _spatial_profile(image, bounds, settings, p), profiles):
-                votes += prediction
+        with ThreadPoolExecutor(max_workers=min(settings["workers"], len(tasks))) as executor:
+            predictions = list(executor.map(lambda p: _spatial_profile(image, bounds, settings, p), tasks))
+    votes = np.sum(predictions[:len(profiles)], axis=0, dtype=np.uint32)
     selected = votes >= settings["vote_threshold"]
+    if recovery["enabled"] and np.any(selected):
+        candidate = np.any(predictions[len(profiles):], axis=0) | selected
+        # 恢复域由已检测主体的实际位置与大小确定，优先补回下半脸，
+        # 不让亮度投票或阴影边缘再次裁掉这些区域，也不向整幅背景无界扩张。
+        scale = min(1.0, recovery["working_size"] / max(image.shape[:2]))
+        size = (max(1, round(image.shape[1]*scale)), max(1, round(image.shape[0]*scale)))
+        core = cv2.resize(selected.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) != 0
+        uncertain = cv2.resize(candidate.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) != 0
+        ys, xs = np.where(core)
+        if len(xs):
+            x0, x1 = np.percentile(xs, [1, 99])
+            y0, y1 = np.percentile(ys, [1, 99])
+            padding = recovery["horizontal_padding"] * max(1.0, x1-x0)
+            yy, xx = np.ogrid[:core.shape[0], :core.shape[1]]
+            allowed = ((yy >= np.quantile(ys, recovery["lower_quantile"]))
+                       & (yy <= y1 + max(1.0, y1-y0))
+                       & (xx >= x0-padding) & (xx <= x1+padding))
+            recovered = core | (uncertain & allowed)
+            selected = cv2.resize(recovered.astype(np.uint8), (image.shape[1], image.shape[0]),
+                                  interpolation=cv2.INTER_NEAREST) != 0
     if settings["face_ellipse"] is not None:
         selected &= _ellipse(selected.shape, settings["face_ellipse"])
     for values in settings["exclude_ellipses"]:

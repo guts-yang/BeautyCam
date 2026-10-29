@@ -21,3 +21,9 @@ clahe:
   enabled: true
   clip_limit: 2.0
   tile_grid_size: [8, 8]
+
+# 向皮肤掩码边界平滑衰减提亮，避免二值掩码产生可见亮度贴片。
+# 半径相对于图像短边；缺少此块或设为0时兼容既有硬掩码行为。
+mask_blend:
+  radius_ratio: 0.03
+  max_compensation: 2.0
