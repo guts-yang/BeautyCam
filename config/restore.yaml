@@ -7,5 +7,11 @@ psf_length: 15
 psf_angle: 0.0
 noise_sigma: 0.01
 
+# 维纳反卷积正则项（与合成噪声记录分离，便于模块隔离调参）
+wiener_k: 0.04
+
+# FFT 反卷积前的反射填充宽度，用于抑制边界振铃
+edge_pad: 48
+
 # 随机种子（评测可复现）
 seed: 42
