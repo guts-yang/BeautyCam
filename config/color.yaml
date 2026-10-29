@@ -4,8 +4,19 @@
 
 # 白平衡
 temperature: 0.0
-wb_method: gray_world
+wb_method: shades_of_gray
+shade_power: 6.0
+balance_strength: 0.6
+
+# 光源估计时排除近黑/近饱和像素；max_rgb 法使用指定分位数
+valid_luma_min: 5.0
+valid_luma_max: 250.0
+max_rgb_percentile: 95.0
+
+# 防止极端色偏估计导致通道溢出
+gain_min: 0.5
+gain_max: 2.0
 
 # 肤色区限定处理
 skin_only: true
-saturation_gain: 1.05
+saturation_gain: 1.0
