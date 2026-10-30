@@ -66,13 +66,35 @@ def _configuration(cfg: Mapping[str, Any]) -> dict[str, Any]:
     if not isinstance(blend, Mapping):
         raise ValueError("exposure.mask_blend 必须为映射")
     radius = _number(blend.get("radius_ratio", 0.0), "mask_blend.radius_ratio")
+    inner_radius = _number(blend.get("inner_radius_ratio", radius), "mask_blend.inner_radius_ratio")
     compensation = _number(blend.get("max_compensation", 2.0), "mask_blend.max_compensation")
     if not 0 <= radius <= 1:
         raise ValueError("exposure.mask_blend.radius_ratio 必须为0..1")
     if not 1 <= compensation <= 4:
         raise ValueError("exposure.mask_blend.max_compensation 必须为1..4")
-    values["mask_blend"] = {"radius_ratio": radius, "max_compensation": compensation}
+    if not 0 <= inner_radius <= 1 or (radius > 0 and inner_radius > radius):
+        raise ValueError("exposure.mask_blend.inner_radius_ratio 必须为0..外边界半径")
+    values["mask_blend"] = {"radius_ratio": radius, "inner_radius_ratio": inner_radius,
+                           "max_compensation": compensation}
+    illumination = cfg.get("illumination", {})
+    if not isinstance(illumination, Mapping):
+        raise ValueError("exposure.illumination 必须为映射")
+    illumination_enabled = illumination.get("enabled", False)
+    if not isinstance(illumination_enabled, (bool, np.bool_)):
+        raise ValueError("exposure.illumination.enabled 必须为布尔值")
+    illumination_radius = _number(illumination.get("radius_ratio", .04), "illumination.radius_ratio")
+    if not 0 < illumination_radius <= 1:
+        raise ValueError("exposure.illumination.radius_ratio 必须为(0,1]")
+    values["illumination"] = {"enabled": bool(illumination_enabled), "radius_ratio": illumination_radius}
     return values
+
+
+def _normalized_blur(values, region, sigma):
+    """只以皮肤邻域估计缓变明暗，避免头发和背景污染亮度基底。"""
+    weight = region.astype(np.float64)
+    blurred_weight = cv2.GaussianBlur(weight, (0, 0), sigma, borderType=cv2.BORDER_REFLECT_101)
+    blurred = cv2.GaussianBlur(values*weight, (0, 0), sigma, borderType=cv2.BORDER_REFLECT_101)
+    return blurred/np.maximum(blurred_weight, np.finfo(np.float64).eps)
 
 
 def _render(original: np.ndarray, ycrcb: np.ndarray,
@@ -126,9 +148,17 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
         return result
     desired = min(mean + settings["gain"] * (settings["target_y"] - mean),
                   mean * settings["max_gain"])
-    curve_y, curve_mean = y, mean
-    clahe = settings["clahe"]
+    illumination = settings["illumination"]
+    source_y = y
     luminance = ycrcb_image[:, :, 0]
+    if illumination["enabled"]:
+        sigma = max(1.0, illumination["radius_ratio"]*min(skin_mask.shape))
+        base = _normalized_blur(luminance.astype(np.float64), region, sigma)
+        source_y = base[region]
+        luminance = luminance.copy()
+        luminance[region] = np.clip(np.rint(source_y), 0, 255).astype(np.uint8)
+    curve_y, curve_mean = source_y, float(np.mean(source_y))
+    clahe = settings["clahe"]
     if clahe["enabled"] and np.max(luminance) != np.min(luminance):
         # 网格多于像素没有意义，按当前图尺寸收敛；避免极小图过度填充。
         grid = (min(clahe["tile_grid_size"][0], image_bgr.shape[1]),
@@ -136,7 +166,7 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
         # 8-bit 共 256 个桶，clip_limit>=256 已等价于不裁剪，避免数值溢出。
         clip = min(clahe["clip_limit"], np.iinfo(np.uint8).max + 1)
         enhanced = cv2.createCLAHE(clipLimit=clip, tileGridSize=grid).apply(luminance)
-        curve_y = np.maximum(y, y + settings["gain"] * (enhanced[region].astype(np.float64) - y))
+        curve_y = np.maximum(source_y, source_y + settings["gain"] * (enhanced[region].astype(np.float64) - source_y))
         curve_mean = float(np.mean(curve_y))
     if settings["method"] == "linear":
         mapped = curve_y * max(1.0, desired / curve_mean)
@@ -148,13 +178,28 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
         # 正浮点数下溢时仍保留 0**positive == 0 的纯黑语义。
         exponent = max(exponent, np.finfo(np.float64).tiny)
         mapped = 255 * (curve_y / 255)**exponent
+    if illumination["enabled"]:
+        # 仅把缓变曝光增量加回原纹理；不直接用局部均衡拉大每个毛孔/暗点。
+        lift = np.zeros(skin_mask.shape, np.float64)
+        lift[region] = np.maximum(mapped-source_y, 0)
+        mapped = y + _normalized_blur(lift, region, max(1.0, sigma*.5))[region]
     mapped = np.minimum(np.maximum(mapped, y), np.minimum(y * settings["max_gain"], 255))
     blend = settings["mask_blend"]
     if blend["radius_ratio"] > 0:
         # 权重只在掩码内部向边缘衰减；掩码外仍逐像素保持输入。
         radius = max(1.0, blend["radius_ratio"] * min(skin_mask.shape))
         distance = cv2.distanceTransform(skin_mask, cv2.DIST_L2, 5)
-        weight = np.minimum(distance[region] / radius, 1.0).astype(np.float64)
+        if blend["inner_radius_ratio"] < blend["radius_ratio"]:
+            # 脸部外轮廓宽羽化，眼唇及小孔窄羽化；不把细小漏点扩大成暗色斑块。
+            contours, _ = cv2.findContours(skin_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            solid = np.zeros_like(skin_mask)
+            cv2.drawContours(solid, contours, -1, 255, -1)
+            outer_distance = cv2.distanceTransform(solid, cv2.DIST_L2, 5)
+            inner_radius = max(1.0, blend["inner_radius_ratio"]*min(skin_mask.shape))
+            weight = np.minimum(outer_distance[region]/radius, distance[region]/inner_radius)
+            weight = np.minimum(weight, 1.0).astype(np.float64)
+        else:
+            weight = np.minimum(distance[region] / radius, 1.0).astype(np.float64)
         weight = weight * weight * (3.0 - 2.0 * weight)
         delta = (mapped - y) * weight
         average = float(np.mean(delta))

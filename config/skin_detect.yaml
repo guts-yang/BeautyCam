@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # skin_detect.yaml —— M1 肤色检测参数（owner: B）
-# B 自有参数：颜色候选 + 确定性图割共识；见 report/lht_m1_final.md。
+# B 自有参数：颜色候选 + 确定性图割共识；当前说明见 report/lht_skin_surface_20261030.md。
 
 # 色彩空间判定阈值（YCrCb 经验区间，供实现参考）
 ycbcr:
@@ -35,9 +35,15 @@ spatial:
   coverage_recovery:
     enabled: true
     working_size: 512
+    # 以下两项仅用于surface关闭时的旧恢复模式。
     lower_quantile: 0.55
     horizontal_padding: 0.25
-  # 鼻、唇等独立语义区保护；所有样本统一使用同一组参数。
-  exclude_ellipses:
-    - [0.5, 0.55, 0.035, 0.1]
-    - [0.5, 0.62, 0.08, 0.04]
+  # 连续皮肤作用域包含鼻子；首轮主体引导第二轮分割，按暗结构和唇色保护五官。
+  surface:
+    enabled: true
+    horizontal_radius: 0.1
+    vertical_radius: 0.3
+    upper_radius: 0.03
+    recover_highlights: true
+    protect_features: true
+  exclude_ellipses: []

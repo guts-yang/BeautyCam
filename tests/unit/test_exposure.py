@@ -74,6 +74,68 @@ def test_mask_blend_does_not_restore_hard_step_on_narrow_fragment():
     assert int(result[64, 63, 0]) - 60 <= 2
 
 
+def test_illumination_adjustment_preserves_fine_contrast_while_lifting_exposure():
+    gray = np.tile(np.array([66, 74], np.uint8), (64, 64))
+    image = np.repeat(gray[:, :, None], 3, axis=2)
+    cfg = {"clahe": {"enabled": True}, "illumination": {"enabled": True, "radius_ratio": .06}}
+    before_cfg = deepcopy(cfg)
+    image.setflags(write=False)
+    result = exposure.process(image, _mask(image), cfg)
+    lift = result[12:-12, 12:-12, 0].astype(float) - gray[12:-12, 12:-12]
+    assert np.ptp(lift) <= 1
+    assert np.mean(lift)/np.mean(gray) >= .15
+    assert cfg == before_cfg
+
+
+def test_illumination_normalization_ignores_excluded_background():
+    first = np.zeros((96, 96, 3), np.uint8)
+    mask = np.zeros((96, 96), np.uint8)
+    mask[20:76, 20:76] = 255
+    first[mask != 0] = 60
+    second = first.copy()
+    second[mask == 0] = 240
+    cfg = {"illumination": {"enabled": True}}
+    a = exposure.process(first, mask, cfg)
+    b = exposure.process(second, mask, cfg)
+    np.testing.assert_array_equal(a[mask != 0], b[mask != 0])
+    np.testing.assert_array_equal(a[mask == 0], first[mask == 0])
+    np.testing.assert_array_equal(b[mask == 0], second[mask == 0])
+
+
+def test_disabled_illumination_is_legacy_exact():
+    image = _image(60, (32, 32))
+    np.testing.assert_array_equal(exposure.process(image, _mask(image), {}),
+                                  exposure.process(image, _mask(image), {"illumination": {"enabled": False}}))
+
+
+def test_small_internal_hole_does_not_create_wide_dark_halo_and_outer_edge_stays_soft():
+    image = _image(60, (128, 128))
+    mask = np.zeros((128, 128), np.uint8)
+    mask[16:112, 16:112] = 255
+    mask[62:66, 62:66] = 0
+    wide = exposure.process(image, mask, {"mask_blend": {"radius_ratio": .10}})
+    narrow = exposure.process(image, mask, {"mask_blend": {"radius_ratio": .10, "inner_radius_ratio": .01}})
+    assert int(narrow[59, 64, 0]) >= int(wide[59, 64, 0])+10
+    assert abs(int(narrow[16, 64, 0])-int(image[16, 64, 0])) <= 1
+    np.testing.assert_array_equal(narrow[mask == 0], image[mask == 0])
+
+
+@pytest.mark.parametrize("inner", [True, -1, float("nan"), .11])
+def test_invalid_internal_blend_radius_is_rejected(inner):
+    image = _image()
+    with pytest.raises(ValueError, match="exposure[.]mask_blend[.]inner_radius_ratio"):
+        exposure.process(image, _mask(image), {"mask_blend": {"radius_ratio": .1, "inner_radius_ratio": inner}})
+
+
+@pytest.mark.parametrize("illumination", [None, {"enabled": "true"}, {"radius_ratio": True},
+                                        {"radius_ratio": 0}, {"radius_ratio": float("inf")},
+                                        {"radius_ratio": 2**2000}])
+def test_invalid_illumination_configuration_is_rejected(illumination):
+    image = _image()
+    with pytest.raises(ValueError, match="exposure[.]illumination"):
+        exposure.process(image, _mask(image), {"illumination": illumination})
+
+
 def test_zero_blend_is_legacy_exact_and_full_mask_is_unchanged():
     image = _image(60, (32, 32))
     mask = _mask(image)

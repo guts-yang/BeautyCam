@@ -26,4 +26,11 @@ clahe:
 # 半径相对于图像短边；缺少此块或设为0时兼容既有硬掩码行为。
 mask_blend:
   radius_ratio: 0.03
+  # 内部眼唇/小孔使用窄羽化，避免把小缺口扩大成大片提亮不足。
+  inner_radius_ratio: 0.005
   max_compensation: 2.0
+
+# 在皮肤内的缓变亮度基底上做CLAHE/曲线，再把曝光增量加回原细节。
+illumination:
+  enabled: true
+  radius_ratio: 0.04

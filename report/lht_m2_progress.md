@@ -1,6 +1,6 @@
 # lht：M2 开发与验收进展
 
-> 当前版本说明（2026-10-29）：本页下方保留融合修复前的历史对照。当前M2已增加掩码内曝光渐变，唯一真实欠曝样本提亮20.8184%、过曝0；详见[修复报告](lht_coverage_fix_20261029.md)和[B验收清单](lht_acceptance.md)。只有旧配置不含mask_blend或半径为0时保留硬掩码兼容；当前YAML仅关闭CLAHE仍启用融合，不能声称与旧版40张逐像素相同。
+> 当前版本说明（2026-10-30）：下方是早期CLAHE及融合修复前后的历史对照。当前M2在缓变亮度基底上调整曝光，外轮廓与内部孔洞分别羽化，当前结果见[本轮报告](lht_skin_surface_20261030.md)和[B验收清单](lht_acceptance.md)。旧配置缺少illumination和mask_blend时保留旧行为；当前YAML仅关闭CLAHE仍保留新处理，不能声称与历史40张输出逐像素相同。
 
 日期：2026-10-22
 关联任务：[#19 M2 实现](https://github.com/guts-yang/BeautyCam/issues/19)、[#20 单测与直方图](https://github.com/guts-yang/BeautyCam/issues/20)

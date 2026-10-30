@@ -135,10 +135,30 @@ def _spatial_configuration(cfg: Mapping[str, Any]) -> dict[str, Any] | None:
         recover_limits[key] = float(value)
     if recover_enabled and not any(p["space"] == "bgr" and p["trusted"] for p in parsed):
         raise ValueError("skin_detect.spatial.coverage_recovery 需要可信BGR配置")
+    surface = spatial.get("surface", {})
+    if not isinstance(surface, Mapping):
+        raise ValueError("skin_detect.spatial.surface 必须为映射")
+    surface_values = {}
+    for key in ("enabled", "recover_highlights", "protect_features"):
+        value = surface.get(key, key != "enabled")
+        if not isinstance(value, (bool, np.bool_)):
+            raise ValueError(f"skin_detect.spatial.surface.{key} 必须为布尔值")
+        surface_values[key] = bool(value)
+    for key, default in (("horizontal_radius", 0.1), ("vertical_radius", 0.3), ("upper_radius", .03)):
+        value = surface.get(key, default)
+        try:
+            number = float(value)
+        except (TypeError, ValueError, OverflowError):
+            raise ValueError(f"skin_detect.spatial.surface.{key} 必须为0..1有限值") from None
+        if (isinstance(value, (bool, np.bool_)) or not isinstance(value, Real)
+                or not np.isfinite(number) or not 0 <= number <= 1):
+            raise ValueError(f"skin_detect.spatial.surface.{key} 必须为0..1有限值")
+        surface_values[key] = number
     return {"center": center, "roi_radius": roi, "seed_radius": seed,
             "iterations": iterations, "gmm_iterations": gmm_iterations, "workers": workers,
             "profiles": parsed, "vote_threshold": votes, "face_ellipse": face,
             "exclude_ellipses": exclusions,
+            "surface": surface_values,
             "coverage_recovery": {"enabled": bool(recover_enabled), "working_size": recover_size,
                                   **recover_limits}}
 
@@ -213,9 +233,23 @@ def _spatial_profile(image, bounds, settings, profile):
     gray = cv2.cvtColor(working, cv2.COLOR_BGR2GRAY)
     if profile["trusted"]:
         foreground, background = seed.copy(), (~broad) | (~color)
+        if settings["surface"]["enabled"]:
+            # 连续皮肤模式的首轮也不能把ROI外的同色皮肤混入初始背景GMM。
+            background = ~color
         if profile.get("non_skin_background", False):
             # ROI之外仍可能是真实面颊/下巴；恢复分支不把这些肤色当成背景模型样本。
             background = ~color
+            if "recovery_core" in profile:
+                # 以首轮实际检测结果为种子，在主体附近重新判断侧脸与下颌。
+                # 不再用固定整图椭圆锁死背景，也不向整幅肤色背景无界扩张。
+                core = cv2.resize(profile["recovery_core"].astype(np.uint8),
+                                  (working.shape[1], working.shape[0]), interpolation=cv2.INTER_NEAREST) != 0
+                foreground = core & color
+                support = _surface_support(_largest_component(core), settings["surface"])
+                mark[:] = cv2.GC_PR_BGD
+                mark[color & support] = cv2.GC_PR_FGD
+                mark[~support | ~color] = cv2.GC_BGD
+                mark[foreground] = cv2.GC_FGD
         if profile["bright_seed"] and np.any(foreground):
             threshold = cv2.threshold(gray[foreground].reshape(-1, 1), 0, 255,
                                       cv2.THRESH_BINARY | cv2.THRESH_OTSU)[0]
@@ -244,18 +278,28 @@ def _spatial_mask(image, color_mask, bounds, settings):
     profiles = settings["profiles"]
     recovery = settings["coverage_recovery"]
     replacements = [i for i, p in enumerate(profiles) if p["space"] == "bgr" and p["trusted"]]
-    tasks = list(profiles)
-    if recovery["enabled"]:
-        tasks += [dict(profiles[i], non_skin_background=True) for i in replacements]
-    if settings["workers"] == 1 or len(tasks) == 1:
-        predictions = [_spatial_profile(image, bounds, settings, profile) for profile in tasks]
-    else:
-        # 每路只读同一输入，持有自己的模型和标记；投票在主调用线程按序汇总。
+    def infer(tasks):
+        if settings["workers"] == 1 or len(tasks) == 1:
+            return [_spatial_profile(image, bounds, settings, profile) for profile in tasks]
+        # 每路只读输入与种子，持有自己的模型；投票按序汇总。
         with ThreadPoolExecutor(max_workers=min(settings["workers"], len(tasks))) as executor:
-            predictions = list(executor.map(lambda p: _spatial_profile(image, bounds, settings, p), tasks))
-    votes = np.sum(predictions[:len(profiles)], axis=0, dtype=np.uint32)
+            return list(executor.map(lambda p: _spatial_profile(image, bounds, settings, p), tasks))
+
+    predictions = infer(profiles)
+    votes = np.sum(predictions, axis=0, dtype=np.uint32)
     selected = votes >= settings["vote_threshold"]
-    if recovery["enabled"] and np.any(selected):
+    if recovery["enabled"]:
+        tasks = [dict(profiles[i], non_skin_background=True) for i in replacements]
+        if settings["surface"]["enabled"] and np.any(selected):
+            tasks = [dict(profile, recovery_core=selected) for profile in tasks]
+        if tasks:
+            predictions += infer(tasks)
+    if settings["surface"]["enabled"] and np.any(selected):
+        candidate = selected.copy()
+        if len(predictions) > len(profiles):
+            candidate |= np.any(predictions[len(profiles):], axis=0)
+        selected = _skin_surface(image, selected, candidate, settings)
+    elif recovery["enabled"] and np.any(selected):
         candidate = np.any(predictions[len(profiles):], axis=0) | selected
         # 恢复域由已检测主体的实际位置与大小确定，优先补回下半脸，
         # 不让亮度投票或阴影边缘再次裁掉这些区域，也不向整幅背景无界扩张。
@@ -280,6 +324,129 @@ def _spatial_mask(image, color_mask, bounds, settings):
     for values in settings["exclude_ellipses"]:
         selected &= ~_ellipse(selected.shape, values)
     return selected.astype(np.uint8) * 255
+
+
+def _largest_component(mask):
+    count, labels, stats, _ = cv2.connectedComponentsWithStats(mask.astype(np.uint8), connectivity=8)
+    if count <= 1:
+        return mask.copy()
+    return labels == 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
+
+
+def _content_features(image, surface, reference=None):
+    """按当前皮肤轮廓定位搜索范围，只保护实际暗结构/唇色，不挖固定鼻子洞。"""
+    ys, xs = np.where(surface if reference is None else reference)
+    if not len(xs):
+        return surface
+    x0, x1 = np.percentile(xs, [1, 99])
+    y0, y1 = np.percentile(ys, [1, 99])
+    width, height = max(1.0, x1-x0), max(1.0, y1-y0)
+    y = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)[:, :, 0]
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,
+                                     (max(3, round(width*.20) | 1), max(3, round(height*.12) | 1)))
+    dark_residual = cv2.morphologyEx(y, cv2.MORPH_BLACKHAT, kernel)
+    threshold = max(8.0, float(np.percentile(dark_residual[surface], 75)))
+    local_y = cv2.GaussianBlur(y.astype(np.float32), (0, 0), max(1.0, height*.03),
+                               borderType=cv2.BORDER_REFLECT_101)
+    # 眼下阴影仍然是皮肤；仅用明显更暗的实际结构作五官保护种子。
+    dark = ((dark_residual > threshold) & (local_y-y > 6)
+            & (y < .55*float(np.median(y[surface]))) & surface).astype(np.uint8)
+    protected = np.zeros_like(surface)
+    yy, xx = np.ogrid[:surface.shape[0], :surface.shape[1]]
+    # 分开检查两侧眼眉，避免鼻梁连接使整个暗连通域过大而被漏掉。
+    # 只保护真实横向暗结构；不把轮廓凸包扩大成整块眼周皮肤缺口。
+    for lower, upper in ((.20, .38), (.38, .56)):
+        for left in (True, False):
+            side = xx < (x0+x1)/2 if left else xx >= (x0+x1)/2
+            region = (dark != 0) & side & (yy > y0+lower*height) & (yy < y0+upper*height)
+            region = cv2.morphologyEx(region.astype(np.uint8), cv2.MORPH_CLOSE, np.ones((3, 5), np.uint8))
+            region = cv2.morphologyEx(region, cv2.MORPH_OPEN,
+                                      np.ones((1, max(3, round(width*.03))), np.uint8))
+            count, labels, stats, _ = cv2.connectedComponentsWithStats(region, connectivity=8)
+            for index in range(1, count):
+                _, _, w, h, area = stats[index]
+                if (w >= .045*width and w > 1.2*h and area > .0003*width*height
+                        and w < .50*width and h < .15*height):
+                    feature = (labels == index).astype(np.uint8)
+                    contours, _ = cv2.findContours(feature, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+                    cv2.drawContours(feature, contours, -1, 1, -1)
+                    protected |= feature != 0
+    r, g = image[:, :, 2].astype(np.float32), image[:, :, 1].astype(np.float32)
+    redness = (r-g)/(r+g+1)
+    local_red = redness-cv2.GaussianBlur(redness, (0, 0), max(1.0, width*.06),
+                                        borderType=cv2.BORDER_REFLECT_101)
+    red_threshold = max(.015, float(np.percentile(local_red[surface], 85)))
+    lips = (surface & (local_red > red_threshold) & (redness > np.median(redness[surface])+.025)
+            & (yy > y0+.68*height) & (yy < y0+.97*height)).astype(np.uint8)
+    lips = cv2.morphologyEx(lips, cv2.MORPH_CLOSE, np.ones((5, 9), np.uint8))
+    count, labels, stats, centers = cv2.connectedComponentsWithStats(lips, connectivity=8)
+    mouth_candidates = []
+    for index in range(1, count):
+        _, _, w, h, _ = stats[index]
+        if (.10*width < w < .55*width and w > 1.2*h and .02*height < h < .20*height
+                and centers[index, 1] > y0+.72*height):
+            region = labels == index
+            score = float(np.sum(np.maximum(local_red[region]-red_threshold, 0)))
+            score *= float(np.mean(redness[region]))**2
+            mouth_candidates.append((score, index))
+    if mouth_candidates:
+        _, best = max(mouth_candidates)
+        for _, index in mouth_candidates:
+            if (abs(centers[index, 1]-centers[best, 1]) > .07*height
+                    or abs(centers[index, 0]-centers[best, 0]) > .3*width):
+                continue
+            feature = (labels == index).astype(np.uint8)
+            contours, _ = cv2.findContours(feature, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(feature, contours, -1, 1, -1)
+            protected |= feature != 0
+    protected = cv2.dilate(protected.astype(np.uint8), np.ones((3, 3), np.uint8)) != 0
+    return surface & ~protected
+
+
+def _surface_support(core, options):
+    """依据检测主体形成圆滑恢复邻域，向下可补下颌，向上仅小幅扩展。"""
+    ys, xs = np.where(core)
+    if not len(xs):
+        return core.copy()
+    x0, x1 = np.percentile(xs, [1, 99])
+    y0, y1 = np.percentile(ys, [1, 99])
+    rx = max(1, round(options["horizontal_radius"]*max(1.0, x1-x0)))
+    ry = max(1, round(options["vertical_radius"]*max(1.0, y1-y0)))
+    upper = max(1, round(options["upper_radius"]*max(1.0, y1-y0)))
+    kernel_y, kernel_x = np.ogrid[-ry:ry+1, -rx:rx+1]
+    vertical_scale = np.where(kernel_y < 0, ry, upper)
+    kernel = ((kernel_x/rx)**2+(kernel_y/vertical_scale)**2 <= 1).astype(np.uint8)
+    return cv2.dilate(core.astype(np.uint8), kernel) != 0
+
+
+def _skin_surface(image, selected, candidate, settings):
+    """连续恢复主体附近的肤色及暴露高光边缘；运行时不使用任何语义GT。"""
+    options = settings["surface"]
+    scale = min(1.0, settings["coverage_recovery"]["working_size"] / max(image.shape[:2]))
+    size = (max(1, round(image.shape[1]*scale)), max(1, round(image.shape[0]*scale)))
+    working = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+    core = _largest_component(cv2.resize(selected.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) != 0)
+    if not np.any(core):
+        return selected.copy()
+    uncertain = cv2.resize(candidate.astype(np.uint8), size, interpolation=cv2.INTER_NEAREST) != 0
+    support = _surface_support(core, options)
+    surface = _largest_component(core | (uncertain & support))
+    if options["recover_highlights"]:
+        contours, _ = cv2.findContours(surface.astype(np.uint8), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        hull, filled = np.zeros_like(core, np.uint8), np.zeros_like(core, np.uint8)
+        cv2.drawContours(hull, [cv2.convexHull(max(contours, key=cv2.contourArea))], -1, 1, -1)
+        cv2.drawContours(filled, contours, -1, 1, -1)
+        y = cv2.cvtColor(working, cv2.COLOR_BGR2YCrCb)[:, :, 0]
+        saturation = cv2.cvtColor(working, cv2.COLOR_BGR2HSV)[:, :, 1]
+        # 仅恢复外露亮边，保留原本封闭的眼部/五官孔洞。
+        surface |= ((hull != 0) & (filled == 0) & (y >= np.percentile(y[surface], 60))
+                    & (saturation <= np.percentile(saturation[surface], 75)))
+    surface = cv2.morphologyEx(surface.astype(np.uint8), cv2.MORPH_CLOSE,
+                               cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))) != 0
+    if options["protect_features"]:
+        surface = _content_features(working, surface, reference=core)
+    return cv2.resize(surface.astype(np.uint8), (image.shape[1], image.shape[0]),
+                      interpolation=cv2.INTER_NEAREST) != 0
 
 
 def detect_skin(image_bgr: np.ndarray, cfg: Mapping[str, Any]) -> np.ndarray:

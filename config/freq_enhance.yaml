@@ -4,8 +4,8 @@
 
 # 低通/高通分离；sigma 为空间等效高斯标准差（像素）
 lowpass_sigma: 3.0
-# 固定 40 张隔离评测校准，见 report/lht_m4_progress.md
-highpass_gain: 0.8
+# 当前轻量细节回注为1.1；完整40张复测及限制见 report/lht_skin_surface_20261030.md。
+highpass_gain: 1.1
 lowpass_gain: 1.0
 
 # 诊断可视化

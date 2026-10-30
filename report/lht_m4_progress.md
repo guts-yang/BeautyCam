@@ -4,7 +4,7 @@
 关联任务：[#23 M4 实现](https://github.com/guts-yang/BeautyCam/issues/23)、[#24 M4 测试与图表](https://github.com/guts-yang/BeautyCam/issues/24)
 状态：算法、单测和 40 张隔离定量评测完成；两名非实现者的人工检查待完成。
 
-当前交付、测试和远程PR状态统一见 [B验收清单](lht_acceptance.md)。本页早期测试数量是阶段记录；2026-10-29最新本地回归为278 passed、1 deselected，PR #52已建立。M4实现与隔离结果未改，M1/M2组合修复见[修复报告](lht_coverage_fix_20261029.md)。
+当前交付、测试和远程PR状态统一见 [B验收清单](lht_acceptance.md)。下方highpass_gain=0.8及B总进度表均为历史记录；2026-10-30当前值为1.1，完整40张高频保留率1.068823、EPI 0.999453；本地回归313 passed、1 deselected。当前M4人工包已重新生成，所有评分仍为空。连续皮肤修正与未达标项见[当前报告](lht_skin_surface_20261030.md)，PR #52保持待验收草稿。
 
 ## 本轮结果
 

@@ -31,6 +31,20 @@ def boundary_change(before, after, mask):
             "p95": float(np.percentile(values, 95)), "max": float(values.max())}
 
 
+def semantic_coverage(mask, semantic):
+    """另报包含鼻子的作用域及五官覆盖；绝不替代原skin_masks主协议。"""
+    pred = mask != 0
+    skin_nose = np.isin(semantic, [1, 2])
+    intersection, union = np.count_nonzero(pred & skin_nose), np.count_nonzero(pred | skin_nose)
+    result = {"skin_plus_nose_iou": intersection/union if union else None,
+              "skin_plus_nose_recall": intersection/np.count_nonzero(skin_nose) if np.any(skin_nose) else None}
+    for key, classes in (("nose_recall", [2]), ("eye_selected_fraction", [4, 5, 6, 7]),
+                         ("lip_selected_fraction", [10, 11, 12])):
+        region = np.isin(semantic, classes)
+        result[key] = np.count_nonzero(pred & region)/np.count_nonzero(region) if np.any(region) else None
+    return result
+
+
 def _read(path, mode):
     image = cv2.imdecode(np.frombuffer(path.read_bytes(), np.uint8), mode)
     if image is None:
@@ -88,6 +102,14 @@ def main(argv=None):
                   "mask_pixels": int(pred.sum()), "boundary_pixels": soft_boundary["pixels"],
                   "exposure_boundary_mean": soft_boundary["mean"], "exposure_boundary_p95": soft_boundary["p95"],
                   "hard_control_boundary_mean": hard_boundary["mean"], "hard_control_boundary_p95": hard_boundary["p95"]}
+        semantic_path = args.data_root/"masks"/f"{sample}.png"
+        if semantic_path.exists():
+            semantic = _read(semantic_path, cv2.IMREAD_GRAYSCALE)
+            semantic = cv2.resize(semantic, (before.shape[1], before.shape[0]), interpolation=cv2.INTER_NEAREST)
+            record.update(semantic_coverage(mask, semantic))
+        else:
+            record.update({key: None for key in ("skin_plus_nose_iou", "skin_plus_nose_recall", "nose_recall",
+                                                "eye_selected_fraction", "lip_selected_fraction")})
         records.append(record)
         overlay = before.copy()
         overlay[pred] = (.6*overlay[pred]+.4*np.array([0, 220, 0])).astype(np.uint8)
@@ -115,6 +137,14 @@ def main(argv=None):
                "subjective_acceptance": "pending; boundary measurements do not establish visual acceptance",
                "config": cfg, "manifest_sha256": hashlib.sha256(args.manifest.read_bytes()).hexdigest(),
                "algorithm_sha256": {name: hashlib.sha256((repo/"src/beauty/modules"/f"{name}.py").read_bytes()).hexdigest() for name in names}}
+    summary["protocol"] = {"primary": "unchanged skin_masks (semantic skin class 1), excludes nose",
+                           "secondary": "semantic classes 1+2 (skin+nose), explanatory only; not a replacement acceptance protocol",
+                           "feature_coverage": "fraction selected, not proof of visible damage or protection"}
+    summary["secondary"] = {}
+    for key in ("skin_plus_nose_iou", "skin_plus_nose_recall", "nose_recall", "eye_selected_fraction", "lip_selected_fraction"):
+        values = [r[key] for r in records if r[key] is not None]
+        summary["secondary"][key] = {"macro_mean": float(np.mean(values)) if values else None, "valid_samples": len(values)}
+    summary["evaluator_sha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
     (args.output/"summary.json").write_text(json.dumps(summary, ensure_ascii=False, indent=2)+"\n", encoding="utf-8")
     return 0
 
