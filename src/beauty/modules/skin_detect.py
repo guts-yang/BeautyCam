@@ -660,6 +660,48 @@ def _haar_brows(image, pred, face, eyes):
     return pred & ~(cv2.dilate(protected, np.ones((3, 3), np.uint8)) != 0)
 
 
+def _mouth_holes(image, selected, filled, face, eyes):
+    """保留原先已分出的嘴部空洞，用位置、横向形状和局部反差验证。"""
+    holes = filled & ~selected
+    if not np.any(holes):
+        return holes
+    x, y, width, height = face
+    mouth_top = y + .66 * height
+    if eyes:
+        eye_y = np.mean([ey + eh / 2 for _, ey, _, eh in eyes])
+        mouth_top = max(mouth_top, eye_y + .34 * height)
+
+    count, labels, stats, centers = cv2.connectedComponentsWithStats(
+        holes.astype(np.uint8), connectivity=8)
+    candidates = []
+    for index in range(1, count):
+        _, top, span, depth, area = stats[index]
+        cx, cy = centers[index]
+        centered = abs(cx - (x + width / 2)) < .24 * width
+        in_mouth_band = (mouth_top < cy < y + .92 * height
+                         and top > y + .61 * height and top + depth < y + .99 * height)
+        shape_matches = (.055 * width < span < .59 * width and depth < .20 * height
+                         and span >= 1.1 * depth and area > .00065 * width * height)
+        if centered and in_mouth_band and shape_matches:
+            candidates.append(index)
+    if not candidates:
+        return np.zeros_like(holes)
+
+    _, green, red = image.astype(np.float32).transpose(2, 0, 1)
+    redness = (red - green) / (red + green + 1)
+    red_residual = redness - cv2.GaussianBlur(redness, (0, 0), max(1, .055 * width))
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY).astype(np.float32)
+    dark_residual = cv2.GaussianBlur(gray, (0, 0), max(1, .040 * width)) - gray
+    keep = np.zeros(count, bool)
+    kernel = np.ones((3, 3), np.uint8)
+    for index in candidates:
+        region = labels == index
+        border = cv2.dilate(region.astype(np.uint8), kernel) != 0
+        keep[index] = (np.percentile(red_residual[border], 80) > .010
+                       or np.percentile(dark_residual[region], 60) > 8)
+    return keep[labels]
+
+
 def _haar_refine(image, mask, options):
     if options is None or min(image.shape[:2]) < 60 or not np.any(mask):
         return mask
@@ -675,12 +717,14 @@ def _haar_refine(image, mask, options):
     filled = selected.astype(np.uint8)
     contours, _ = cv2.findContours(filled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     cv2.drawContours(filled, contours, -1, 1, -1)
-    result = _haar_contour(working, filled != 0, face, eyes)
+    filled = filled != 0
+    result = _haar_contour(working, filled, face, eyes)
     result = _haar_brows(working, result, face, eyes)
     reference = np.zeros_like(selected)
     x, y, width, height = np.rint(face).astype(int)
     reference[max(0, y):y+height, max(0, x):x+width] = True
     result = _content_features(working, result, reference=reference, protect_dark=not bool(eyes))
+    result &= ~_mouth_holes(working, selected, filled, face, eyes)
     return cv2.resize(result.astype(np.uint8)*255, (image.shape[1], image.shape[0]),
                       interpolation=cv2.INTER_NEAREST)
 

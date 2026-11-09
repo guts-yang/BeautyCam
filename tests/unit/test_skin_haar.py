@@ -127,3 +127,23 @@ def test_final_morphology_cleans_localized_mask_instead_of_running_before_it(mon
     assert skin_detect.detect_skin(image, {"postprocess": {"enabled": False}})[10, 10] == 255
     cleaned = skin_detect.detect_skin(image, {})
     assert cleaned[10, 10] == 0 and cleaned[45, 45] == 255
+
+
+def test_mouth_hole_survives_without_restoring_false_nose_or_chin_exclusions():
+    image = np.full((160, 160, 3), (90, 130, 165), np.uint8)
+    filled = np.zeros(image.shape[:2], bool)
+    filled[35:133, 42:116] = True
+    selected = filled.copy()
+    lip = np.s_[101:106, 64:94]
+    nose_shadow = np.s_[75:80, 64:94]
+    chin_shadow = np.s_[112:118, 64:94]
+    for region in (lip, nose_shadow, chin_shadow):
+        selected[region] = False
+        image[region] = (45, 50, 142)
+
+    face = np.array([28., 20., 100., 100.])
+    eyes = [np.array([50., 53., 20., 20.]), np.array([86., 53., 20., 20.])]
+    protected = skin_detect._mouth_holes(image, selected, filled, face, eyes)
+    expected = np.zeros_like(protected)
+    expected[lip] = True
+    np.testing.assert_array_equal(protected, expected)
