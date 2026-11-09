@@ -2,9 +2,10 @@
 # freq_enhance.yaml —— M4 频域增强参数（owner: B）
 # 验收基线：皮肤区高频能量保留率 0.70–1.30；五官 GT 区 EPI ≥ 0.80。
 
-# 低通/高通分离
+# 低通/高通分离；sigma 为空间等效高斯标准差（像素）
 lowpass_sigma: 3.0
-highpass_gain: 0.5
+# 当前轻量细节回注为1.1；完整40张复测及限制见 report/lht_skin_surface_20261030.md。
+highpass_gain: 1.1
 lowpass_gain: 1.0
 
 # 诊断可视化

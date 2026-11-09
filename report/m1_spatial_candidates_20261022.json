@@ -1,0 +1,158 @@
+[
+  {
+    "name": "pilot_best",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.4,
+      0.43
+    ],
+    "seed_radius": [
+      0.15,
+      0.2
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "shorter_roi",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.4,
+      0.38
+    ],
+    "seed_radius": [
+      0.15,
+      0.17
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "lower_center",
+    "center": [
+      0.5,
+      0.5
+    ],
+    "roi_radius": [
+      0.4,
+      0.4
+    ],
+    "seed_radius": [
+      0.15,
+      0.17
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "narrower_roi",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.37,
+      0.4
+    ],
+    "seed_radius": [
+      0.15,
+      0.17
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "shorter_seed",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.4,
+      0.43
+    ],
+    "seed_radius": [
+      0.15,
+      0.14
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "higher_center",
+    "center": [
+      0.5,
+      0.46
+    ],
+    "roi_radius": [
+      0.4,
+      0.4
+    ],
+    "seed_radius": [
+      0.15,
+      0.14
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0
+  },
+  {
+    "name": "tight_seed_color",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.4,
+      0.43
+    ],
+    "seed_radius": [
+      0.15,
+      0.2
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0,
+    "seed_ycbcr": {
+      "cr_min": 144,
+      "cr_max": 170,
+      "cb_min": 80,
+      "cb_max": 120
+    }
+  },
+  {
+    "name": "short_roi_tight_seed",
+    "center": [
+      0.5,
+      0.48
+    ],
+    "roi_radius": [
+      0.4,
+      0.38
+    ],
+    "seed_radius": [
+      0.15,
+      0.17
+    ],
+    "working_size": 512,
+    "iterations": 3,
+    "rng_seed": 0,
+    "seed_ycbcr": {
+      "cr_min": 144,
+      "cr_max": 170,
+      "cb_min": 80,
+      "cb_max": 120
+    }
+  }
+]
