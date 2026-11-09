@@ -14,9 +14,13 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import base64
+import binascii
 from concurrent.futures import ThreadPoolExecutor
+import hashlib
 from numbers import Integral, Real
 from typing import Any
+import zlib
 
 import cv2
 import numpy as np
@@ -333,10 +337,10 @@ def _largest_component(mask):
     return labels == 1 + np.argmax(stats[1:, cv2.CC_STAT_AREA])
 
 
-def _content_features(image, surface, reference=None):
+def _content_features(image, surface, reference=None, protect_dark=True):
     """按当前皮肤轮廓定位搜索范围，只保护实际暗结构/唇色，不挖固定鼻子洞。"""
     ys, xs = np.where(surface if reference is None else reference)
-    if not len(xs):
+    if not len(xs) or not np.any(surface):
         return surface
     x0, x1 = np.percentile(xs, [1, 99])
     y0, y1 = np.percentile(ys, [1, 99])
@@ -355,7 +359,7 @@ def _content_features(image, surface, reference=None):
     yy, xx = np.ogrid[:surface.shape[0], :surface.shape[1]]
     # 分开检查两侧眼眉，避免鼻梁连接使整个暗连通域过大而被漏掉。
     # 只保护真实横向暗结构；不把轮廓凸包扩大成整块眼周皮肤缺口。
-    for lower, upper in ((.20, .38), (.38, .56)):
+    for lower, upper in (((.20, .38), (.38, .56)) if protect_dark else ()):
         for left in (True, False):
             side = xx < (x0+x1)/2 if left else xx >= (x0+x1)/2
             region = (dark != 0) & side & (yy > y0+lower*height) & (yy < y0+upper*height)
@@ -449,6 +453,238 @@ def _skin_surface(image, selected, candidate, settings):
                       interpolation=cv2.INTER_NEAREST) != 0
 
 
+def _haar_configuration(cfg):
+    """Haar 是用户明确批准的传统预训练模型例外；模型仅由 cfg 传入。"""
+    options = cfg.get("face_locator", {})
+    if not isinstance(options, Mapping):
+        raise ValueError("skin_detect.face_locator 必须为映射")
+    enabled = options.get("enabled", False)
+    if not isinstance(enabled, (bool, np.bool_)):
+        raise ValueError("skin_detect.face_locator.enabled 必须为布尔值")
+    if not enabled:
+        return None
+    size = _integer(options.get("working_size", 512), "face_locator.working_size", 64, 1024)
+    models = options.get("models")
+    if not isinstance(models, Mapping) or set(models) != {"face_default", "face_alt2", "eyes"}:
+        raise ValueError("skin_detect.face_locator.models 需要 face_default/face_alt2/eyes")
+    for value in models.values():
+        if (not isinstance(value, Mapping) or not isinstance(value.get("xml_zlib_base64"), str)
+                or not isinstance(value.get("sha256"), str)):
+            raise ValueError("skin_detect.face_locator.models 需要内存XML和SHA256")
+    return {"working_size": size, "models": models}
+
+
+def _haar_classifier(payload):
+    """解压带原始许可的完整XML，并用FileStorage MEMORY模式读取，无文件I/O。"""
+    storage = None
+    try:
+        packed = base64.b64decode("".join(payload["xml_zlib_base64"].split()), validate=True)
+        decoder = zlib.decompressobj()
+        xml_bytes = decoder.decompress(packed, 8 * 1024 * 1024)
+        if not decoder.eof or decoder.unused_data:
+            raise ValueError("XML压缩流过大或含额外数据")
+        if hashlib.sha256(xml_bytes).hexdigest() != payload["sha256"]:
+            raise ValueError("XML SHA256不匹配")
+        xml = xml_bytes.decode("utf-8")
+        storage = cv2.FileStorage(xml, cv2.FILE_STORAGE_READ | cv2.FILE_STORAGE_MEMORY)
+        model = cv2.CascadeClassifier()
+        if not model.read(storage.getFirstTopLevelNode()) or model.empty():
+            raise ValueError("无有效Haar级联")
+        return model
+    except (KeyError, TypeError, ValueError, UnicodeError, binascii.Error, zlib.error, cv2.error) as error:
+        raise ValueError(f"skin_detect.face_locator 模型无效：{error}") from None
+    finally:
+        if storage is not None:
+            storage.release()
+
+
+def _box_overlap(a, b):
+    ax, ay, aw, ah = a
+    bx, by, bw, bh = b
+    area = max(0, min(ax+aw, bx+bw)-max(ax, bx)) * max(0, min(ay+ah, by+bh)-max(ay, by))
+    return area / max(1, aw*ah+bw*bh-area)
+
+
+def _haar_localize(image, models):
+    """选择主要人脸；两种级联一致或有效双眼才信任定位，否则返回None。"""
+    gray = cv2.equalizeHist(cv2.cvtColor(image, cv2.COLOR_BGR2GRAY))
+    candidates = []
+    for index, key in enumerate(("face_default", "face_alt2")):
+        boxes = _haar_classifier(models[key]).detectMultiScale(
+            gray, scaleFactor=1.08, minNeighbors=3, minSize=(60, 60))
+        candidates.extend((tuple(map(int, box)), index) for box in boxes)
+    if not candidates:
+        return None
+
+    def rank(item):
+        (x, y, w, h), _ = item
+        return w*h/(1+((x+w/2-gray.shape[1]/2)/gray.shape[1])**2
+                    + ((y+h/2-gray.shape[0]/2)/gray.shape[0])**2)
+
+    best = max(candidates, key=rank)[0]
+    agreeing = [(box, index) for box, index in candidates if _box_overlap(box, best) > .5]
+    face = np.rint(np.mean([box for box, _ in agreeing], axis=0)).astype(int)
+    x, y, w, h = face
+    roi = gray[y:min(y+round(.65*h), gray.shape[0]), x:min(x+w, gray.shape[1])]
+    boxes = _haar_classifier(models["eyes"]).detectMultiScale(
+        roi, scaleFactor=1.05, minNeighbors=3,
+        minSize=(max(10, round(w*.1)), max(10, round(h*.1))),
+        maxSize=(max(11, round(w*.30)), max(11, round(h*.30))))
+    eyes = [(int(ex+x), int(ey+y), int(ew), int(eh)) for ex, ey, ew, eh in boxes]
+    pairs = []
+    for index, first in enumerate(eyes):
+        for second in eyes[index+1:]:
+            left, right = sorted((first, second), key=lambda box: box[0])
+            lx, ly, lw, lh = left
+            rx, ry, rw, rh = right
+            dx, dy = rx+rw/2-lx-lw/2, ry+rh/2-ly-lh/2
+            if .2*w < dx < .75*w and abs(dy) < .15*h and max(lw, rw)/min(lw, rw) < 1.8:
+                score = (lw*lh+rw*rh)/(1+5*abs(dy)/h+abs((lx+lw/2+rx+rw/2)/2-(x+w/2))/w)
+                pairs.append((score, left, right))
+    # 无成对眼睛时不凭单个误检框挖洞，双人脸级联仍可约束外轮廓。
+    pair = list(max(pairs, key=lambda item: item[0])[1:]) if pairs else []
+    if len({index for _, index in agreeing}) < 2 and not pair:
+        return None
+    return face.astype(float), [np.asarray(box, float) for box in pair]
+
+
+def _contour_path(cost, step=3, penalty=.15):
+    """动态规划追踪连续边缘；代价只来自图像和Haar局部几何先验。"""
+    height, width = cost.shape
+    previous = cost[:, 0].copy()
+    back = np.zeros((height, width), np.int8)
+    offsets = np.arange(-step, step+1)
+    for col in range(1, width):
+        padded = np.pad(previous, (step, step), constant_values=np.inf)
+        alternatives = np.stack([padded[step+d:step+d+height]+penalty*d*d for d in offsets])
+        choice = np.argmin(alternatives, axis=0)
+        back[:, col] = offsets[choice]
+        previous = cost[:, col] + alternatives[choice, np.arange(height)]
+    row = int(np.argmin(previous))
+    path = np.empty(width, int)
+    path[-1] = row
+    for col in range(width-1, 0, -1):
+        row += int(back[row, col])
+        path[col-1] = row
+    return path
+
+
+def _haar_contour(image, mask, face, eyes):
+    """宽松人脸域内，分别用皮肤转变和下颌边缘排除头发、颈部。"""
+    x, y, w, h = face
+    distance = .35*w
+    if len(eyes) == 2:
+        centers = [eye[:2]+eye[2:]/2 for eye in eyes]
+        distance = abs(centers[1][0]-centers[0][0])
+        factor = np.clip(distance/(.45*w), 1, 1.18)
+        x -= w*(factor-1)/2
+        w, h = w*factor, h*factor
+    cx = x+w/2
+    yy, xx = np.mgrid[:mask.shape[0], :mask.shape[1]]
+    top, bottom = max(0, y-.35*h), min(mask.shape[0]-1, y+1.23*h)
+    cy = (top+bottom)/2
+    pred = mask & ((np.abs((xx-cx)/(.50*w))**3
+                    + np.abs((yy-cy)/max(1, (bottom-top)/2))**3) <= 1)
+    ycc = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb).astype(np.float32)
+    gray = ycc[:, :, 0]
+    dy = cv2.Sobel(cv2.GaussianBlur(gray, (0, 0), 2), cv2.CV_32F, 0, 1, ksize=3)/8
+    a, b = max(0, round(y+.03*h)), min(mask.shape[0], round(y+.18*h))
+    left, right = max(0, round(cx-.2*w)), min(mask.shape[1], round(cx+.2*w))
+    seed = mask[a:b, left:right]
+    if np.any(seed):
+        samples = ycc[a:b, left:right][seed]
+        median = np.median(samples, axis=0)
+        mad = np.median(np.abs(samples-median), axis=0)
+        high = gray-cv2.GaussianBlur(gray, (0, 0), 1)
+        rms = np.sqrt(cv2.GaussianBlur(high*high, (0, 0), 2))
+        texture = max(6, 3*float(np.median(rms[a:b, left:right][seed])))
+        skin = (mask & (np.abs(ycc[:, :, 1]-median[1]) < max(8, 3*mad[1]))
+                & (np.abs(ycc[:, :, 2]-median[2]) < max(8, 3*mad[2]))
+                & (gray > median[0]*.6) & (rms < texture)).astype(np.float32)
+    else:
+        skin = mask.astype(np.float32)
+    edge = cv2.Sobel(cv2.GaussianBlur(skin, (0, 0), 2), cv2.CV_32F, 0, 1, ksize=3)/8
+    x0, x1 = max(0, round(cx-.50*w)), min(mask.shape[1], round(cx+.50*w)+1)
+    norm = (np.arange(x0, x1)-cx)/(.5*w)
+    lo, hi = max(0, round(y-.35*h)), min(mask.shape[0], round(y+.25*h))
+    if hi > lo and x1 > x0:
+        strength = np.maximum(edge[lo:hi, x0:x1], 0)
+        strength = np.clip(strength/max(.01, float(np.percentile(strength, 95))), 0, 3)
+        prior = y-.10*h+.13*h*norm**2
+        rows = np.arange(lo, hi)[:, None]
+        path = _contour_path(-strength+.25*((rows-prior[None, :])/max(5, .15*h))**2)+lo
+        boundary = np.full(mask.shape[1], lo)
+        boundary[x0:x1] = path
+        pred &= yy >= boundary[None, :]
+    lo, hi = max(0, round(y+.72*h)), min(mask.shape[0], round(y+1.23*h))
+    if hi > lo and x1 > x0:
+        strength = np.maximum(-dy[lo:hi, x0:x1], 0)
+        strength /= max(.5, float(np.percentile(strength, 95)))
+        drop = cv2.Sobel(cv2.GaussianBlur(mask.astype(np.float32), (0, 0), 2), cv2.CV_32F, 0, 1, ksize=3)/8
+        strength = np.clip(strength+3*np.maximum(-drop[lo:hi, x0:x1], 0), 0, 3)
+        prior = y+1.04*h-.18*h*norm**2
+        rows = np.arange(lo, hi)[:, None]
+        path = _contour_path(-strength+.8*((rows-prior[None, :])/max(5, .11*h))**2)+lo
+        boundary = np.full(mask.shape[1], hi)
+        boundary[x0:x1] = path
+        pred &= yy <= boundary[None, :]
+    for ex, ey, ew, eh in eyes:
+        rx, ry = min(.45*ew, .24*distance), min(.12*eh, .07*distance)
+        pred &= ((xx-ex-ew/2)/max(1, rx))**2 + ((yy-ey-eh/2)/max(1, ry))**2 > 1
+    return pred
+
+
+def _haar_brows(image, pred, face, eyes):
+    """眼睛上方只剔除实际横向眉毛暗结构，不把整块阴影挖掉。"""
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2YCrCb)[:, :, 0].astype(np.float32)
+    yy, xx = np.ogrid[:pred.shape[0], :pred.shape[1]]
+    fw, fh = face[2:]
+    protected = np.zeros_like(pred, np.uint8)
+    for ex, ey, ew, eh in eyes:
+        cy = ey+eh/2
+        residual = cv2.GaussianBlur(gray, (0, 0), max(1, .18*ew))-gray
+        band = ((xx > ex-.2*ew) & (xx < ex+1.2*ew) & (yy > cy-.95*eh) & (yy < cy-.25*eh))
+        dark = cv2.morphologyEx((band & (residual > 6) & pred).astype(np.uint8),
+                                cv2.MORPH_CLOSE, np.ones((3, 5), np.uint8))
+        count, labels, stats, _ = cv2.connectedComponentsWithStats(dark, connectivity=8)
+        options = []
+        for index in range(1, count):
+            _, _, width, height, area = stats[index]
+            if width > .25*ew and width > 1.3*height and area > .0005*fw*fh:
+                options.append((area*float(residual[labels == index].mean()), index))
+        if options:
+            index = max(options)[1]
+            contours, _ = cv2.findContours((labels == index).astype(np.uint8),
+                                           cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            cv2.drawContours(protected, contours, -1, 1, -1)
+    return pred & ~(cv2.dilate(protected, np.ones((3, 3), np.uint8)) != 0)
+
+
+def _haar_refine(image, mask, options):
+    if options is None or min(image.shape[:2]) < 60 or not np.any(mask):
+        return mask
+    scale = min(1., options["working_size"]/max(image.shape[:2]))
+    size = (max(1, round(image.shape[1]*scale)), max(1, round(image.shape[0]*scale)))
+    working = cv2.resize(image, size, interpolation=cv2.INTER_AREA)
+    location = _haar_localize(working, options["models"])
+    if location is None:
+        return mask
+    face, eyes = location
+    selected = cv2.resize(mask, size, interpolation=cv2.INTER_NEAREST) != 0
+    # 先恢复被高光/阴影造成的闭合空洞，再依据真实检测位置重新保护眼眉、唇。
+    filled = selected.astype(np.uint8)
+    contours, _ = cv2.findContours(filled, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    cv2.drawContours(filled, contours, -1, 1, -1)
+    result = _haar_contour(working, filled != 0, face, eyes)
+    result = _haar_brows(working, result, face, eyes)
+    reference = np.zeros_like(selected)
+    x, y, width, height = np.rint(face).astype(int)
+    reference[max(0, y):y+height, max(0, x):x+width] = True
+    result = _content_features(working, result, reference=reference, protect_dark=not bool(eyes))
+    return cv2.resize(result.astype(np.uint8)*255, (image.shape[1], image.shape[0]),
+                      interpolation=cv2.INTER_NEAREST)
+
+
 def detect_skin(image_bgr: np.ndarray, cfg: Mapping[str, Any]) -> np.ndarray:
     """返回新建的同尺寸 uint8 皮肤掩码（0/255），不改变输入或配置。
 
@@ -462,10 +698,12 @@ def detect_skin(image_bgr: np.ndarray, cfg: Mapping[str, Any]) -> np.ndarray:
         raise ValueError("detect_skin 需要非空 BGR uint8 H×W×3 输入")
     cr_min, cr_max, cb_min, cb_max, enabled, kernel_size, area_ratio = _configuration(cfg)
     spatial = _spatial_configuration(cfg)
+    locator = _haar_configuration(cfg)
     ycrcb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2YCrCb)
     mask = cv2.inRange(ycrcb, (0, cr_min, cb_min), (255, cr_max, cb_max))
     if spatial is not None:
         mask = _spatial_mask(image_bgr, mask, (cr_min, cr_max, cb_min, cb_max), spatial)
+    mask = _haar_refine(image_bgr, mask, locator)
     if not enabled:
         return mask
     if kernel_size > 1:
