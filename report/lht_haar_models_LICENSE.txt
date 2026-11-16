@@ -1,10 +1,10 @@
-OpenCV classic Haar models distributed inside config/skin_detect.yaml
+OpenCV classic Haar model resources used by BeautyCam M1
 
 Models: haarcascade_frontalface_default.xml; haarcascade_frontalface_alt2.xml; haarcascade_eye_tree_eyeglasses.xml
 Local source: opencv-python-headless 4.10.0.84, cv2/data (OpenCV 4.10.0).
-The complete XML files, including their original comments, are retained losslessly in zlib/base64 configuration payloads.
+Current implementation loads the original XML files from the installed cv2.data package. Each file retains its original licence comments. Model XML is no longer embedded in the YAML configuration.
 Face models created by Rainer Lienhart. Eye model created by Shameem Hameed.
-Upstream references and SHA256 values are recorded in the YAML and report/lht_haar_20261031.md.
+Upstream references and SHA256 values are recorded in report/lht_haar_20261031.md and report/lht_review_fixes_20261116.md. Run tools/inspect_haar_models.py to inspect the installed package resources.
 
   IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
 

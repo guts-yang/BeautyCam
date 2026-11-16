@@ -165,6 +165,32 @@ def test_gmm_models_are_finite_positive_definite_and_input_only():
     np.testing.assert_array_equal(model, skin_detect._gmm_model(pixels, 5))
 
 
+def test_freeze_mode_consumes_covariance_and_keeps_model_bytes_unchanged():
+    """非球形高斯能区分cov和inv(cov)，防止误改OpenCV的模型布局。"""
+    def gaussian(center, variances):
+        model = np.zeros((1, 65), np.float64)
+        model[0, 0] = 1
+        model[0, 5:8] = center
+        model[0, 20:29] = np.diag(variances).ravel()
+        return model
+
+    image = np.full((3, 3, 3), (130, 100, 100), np.uint8)
+    foreground = gaussian([120, 100, 100], [10000, 25, 25])
+    background = gaussian([100, 100, 100], [1, 1, 1])
+    saved_fg, saved_bg = foreground.copy(), background.copy()
+    mask = np.full((3, 3), cv2.GC_PR_BGD, np.uint8)
+    cv2.grabCut(image, mask, None, background, foreground, 1, cv2.GC_EVAL_FREEZE_MODEL)
+    assert np.all(mask == cv2.GC_PR_FGD)
+    np.testing.assert_array_equal(foreground, saved_fg)
+    np.testing.assert_array_equal(background, saved_bg)
+
+    incorrect = saved_fg.copy()
+    incorrect[0, 20:29] = np.linalg.inv(saved_fg[0, 20:29].reshape(3, 3)).ravel()
+    opposite = np.full((3, 3), cv2.GC_PR_FGD, np.uint8)
+    cv2.grabCut(image, opposite, None, saved_bg.copy(), incorrect, 1, cv2.GC_EVAL_FREEZE_MODEL)
+    assert np.all(opposite == cv2.GC_PR_BGD)
+
+
 def _expanded_pixel_gmm(pixels, iterations):
     """逐像素参考，用于验证颜色计数加权保留 Lloyd 拟合的数值结果。"""
     data = pixels.astype(np.float64)

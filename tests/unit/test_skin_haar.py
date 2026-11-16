@@ -1,9 +1,7 @@
-"""Authorized classic Haar: in-memory models, localization fallback and skin continuity."""
-import base64
+"""Classic Haar package resources, independent switches and skin continuity."""
 from copy import deepcopy
 import hashlib
 from pathlib import Path
-import zlib
 
 import cv2
 import numpy as np
@@ -19,26 +17,31 @@ def locator():
     return skin_detect._haar_configuration(cfg)
 
 
-def test_all_packaged_models_load_from_memory_and_keep_original_licences(locator, monkeypatch):
+def test_models_load_from_opencv_package_instead_of_yaml_payloads(locator, monkeypatch):
     real_storage = cv2.FileStorage
     calls = []
 
     def storage(xml, flags):
-        assert xml.lstrip().startswith("<?xml")
-        assert flags & cv2.FILE_STORAGE_MEMORY
+        assert xml.lstrip().startswith("<?xml") and flags & cv2.FILE_STORAGE_MEMORY
         calls.append(flags)
         return real_storage(xml, flags)
 
+    expected = {
+        "face_default": "0f7d4527844eb514d4a4948e822da90fbb16a34a0bbbbc6adc6498747a5aafb0",
+        "face_alt2": "7b0c967d9abbdfbde025eb9c786947d151b6426040d07a8f9562ed8fd90724b4",
+        "eyes": "e32f9c67935c33e9d1331eb14fa58554ff17835c03742663bcb97a892e936a57",
+    }
     monkeypatch.setattr(cv2, "FileStorage", storage)
-    for payload in locator["models"].values():
-        xml = zlib.decompress(base64.b64decode(payload["xml_zlib_base64"]))
-        assert hashlib.sha256(xml).hexdigest() == payload["sha256"]
+    for role, resource in locator["models"].items():
+        assert isinstance(resource, str) and len(resource) < 60
+        xml = (Path(cv2.data.haarcascades) / resource).read_bytes()
+        assert hashlib.sha256(xml).hexdigest() == expected[role]
         assert b"Redistribution" in xml and b"Intel Corporation" in xml
-        assert not skin_detect._haar_classifier(payload).empty()
+        assert not skin_detect._haar_classifier(resource).empty()
     assert len(calls) == 3
 
 
-def test_localizer_does_not_read_files_modify_configuration_or_consume_rng(locator, monkeypatch):
+def test_localizer_does_not_read_user_images_modify_config_or_consume_rng(locator, monkeypatch):
     image = np.full((128, 160, 3), (240, 20, 20), np.uint8)
     image.setflags(write=False)
     saved = deepcopy(locator)
@@ -46,7 +49,8 @@ def test_localizer_does_not_read_files_modify_configuration_or_consume_rng(locat
     def no_files(*args, **kwargs):
         raise AssertionError("algorithm attempted file I/O")
 
-    monkeypatch.setattr("builtins.open", no_files)
+    monkeypatch.setattr(cv2, "imread", no_files)
+    monkeypatch.setattr(cv2, "imwrite", no_files)
     cv2.setRNGSeed(19)
     expected = cv2.randu(np.empty((5, 5), np.float32), 0, 1)
     cv2.setRNGSeed(19)
@@ -98,14 +102,15 @@ def test_invalid_locator_configuration_is_rejected(cfg):
         skin_detect._haar_configuration(cfg)
 
 
-def test_corrupt_models_raise_clear_error(locator):
-    payload = dict(locator["models"]["eyes"])
-    payload["sha256"] = "0"*64
-    with pytest.raises(ValueError, match="SHA256"):
-        skin_detect._haar_classifier(payload)
-    payload["xml_zlib_base64"] = "not a base64 model"
-    with pytest.raises(ValueError, match="模型无效"):
-        skin_detect._haar_classifier(payload)
+def test_missing_package_model_has_clear_error(locator, monkeypatch):
+    class MissingClassifier:
+        def read(self, node):
+            return True
+        def empty(self):
+            return True
+    monkeypatch.setattr(cv2, "CascadeClassifier", lambda: MissingClassifier())
+    with pytest.raises(ValueError, match="skin_detect.face_locator.*包内级联资源"):
+        skin_detect._haar_classifier(locator["models"]["eyes"])
 
 
 def test_disabled_or_absent_locator_retains_legacy_behavior(monkeypatch):
@@ -122,7 +127,7 @@ def test_final_morphology_cleans_localized_mask_instead_of_running_before_it(mon
     localized = np.zeros(image.shape[:2], np.uint8)
     localized[25:70, 25:70] = 255
     localized[10, 10] = 255
-    monkeypatch.setattr(skin_detect, "_haar_configuration", lambda _: {})
+    monkeypatch.setattr(skin_detect, "_haar_configuration", lambda _: None)
     monkeypatch.setattr(skin_detect, "_haar_refine", lambda *_: localized.copy())
     assert skin_detect.detect_skin(image, {"postprocess": {"enabled": False}})[10, 10] == 255
     cleaned = skin_detect.detect_skin(image, {})
@@ -147,3 +152,35 @@ def test_mouth_hole_survives_without_restoring_false_nose_or_chin_exclusions():
     expected = np.zeros_like(protected)
     expected[lip] = True
     np.testing.assert_array_equal(protected, expected)
+
+
+def test_default_fixed_geometry_is_disabled_and_off_center_skin_is_retained(locator, monkeypatch):
+    cfg = yaml.safe_load((Path(__file__).resolve().parents[2]/"config/skin_detect.yaml").read_text(encoding="utf-8"))
+    assert cfg["spatial"]["enabled"] is False
+    assert cfg["face_locator"]["enabled"] is True
+    monkeypatch.setattr(skin_detect, "_haar_localize", lambda *_: None)
+    image = np.full((128, 160, 3), (255, 0, 0), np.uint8)
+    image[4:40, 5:50] = (80, 120, 180)
+    mask = skin_detect.detect_skin(image, cfg)
+    expected = skin_detect.detect_skin(image, {"postprocess": cfg["postprocess"]})
+    np.testing.assert_array_equal(mask, expected)
+    assert np.all(mask[8:36, 9:46] == 255)
+    assert not np.any(mask[50:])
+
+
+def test_detected_face_segmentation_seeds_translate_with_face(locator):
+    working = np.zeros((512, 512, 3), np.uint8)
+    first = skin_detect._face_segmentation((working, (np.array([120., 150., 240., 240.]), [])), locator)
+    moved = skin_detect._face_segmentation((working, (np.array([55., 65., 240., 240.]), [])), locator)
+    np.testing.assert_allclose(np.subtract(moved["center"], first["center"]), [-65/511, -85/511])
+    assert first["roi_radius"] == moved["roi_radius"]
+    assert first["seed_radius"] == moved["seed_radius"]
+
+
+@pytest.mark.parametrize("bad_name", ["../secret.xml", "C:/model.xml", "model.xml", "haarcascade_face.xml/extra"])
+def test_model_resources_cannot_point_to_user_files(bad_name):
+    cfg = {"face_locator": {"enabled": True, "models": {
+        "face_default": bad_name, "face_alt2": "haarcascade_frontalface_alt2.xml",
+        "eyes": "haarcascade_eye_tree_eyeglasses.xml"}}}
+    with pytest.raises(ValueError, match="包内haarcascade"):
+        skin_detect._haar_configuration(cfg)
