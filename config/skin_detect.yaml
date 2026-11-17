@@ -1,16 +1,198 @@
 # -*- coding: utf-8 -*-
-# skin_detect.yaml —— M1 肤色检测参数（owner: B）
-# 数值为 v1.0 预设基线，试测后如需调整走 change-request。
+# M1肤色检测（B / qixing1227）
+# 默认路径为YCrCb候选、Haar脸框内图割、五官保护与掩码清理。
+# 实现、评测和复现方式见report/b_modules.md。
 
-# 色彩空间判定阈值（YCrCb 经验区间，供实现参考）
+# OpenCV通道顺序为Y、Cr、Cb，下面仅限制色度。
 ycbcr:
   cr_min: 133
   cr_max: 173
   cb_min: 77
   cb_max: 127
 
-# 掩码后处理
+# 分割之后的形态清理与小连通域过滤。
 postprocess:
   enabled: true
   morph_kernel: 5
   min_area_ratio: 0.001
+
+# 固定构图图割。默认关闭，仅显式开启时使用整图center/roi_radius/seed_radius。
+# 面向已确认居中的单人肖像，开启后仍可能裁切偏位人像。
+spatial:
+  enabled: false
+  center:
+  - 0.5
+  - 0.48
+  roi_radius:
+  - 0.4
+  - 0.43
+  seed_radius:
+  - 0.15
+  - 0.2
+  iterations: 3
+  gmm_iterations: 10
+  workers: 3
+  vote_threshold: 2
+  profiles:
+  - space: gray
+    working_size: 256
+    trusted: false
+    bright_seed: false
+  - space: bgr
+    working_size: 512
+    trusted: true
+    bright_seed: false
+  - space: bgr
+    working_size: 512
+    trusted: true
+    bright_seed: true
+  face_ellipse: null
+  coverage_recovery:
+    enabled: true
+    working_size: 512
+    lower_quantile: 0.55
+    horizontal_padding: 0.25
+  surface:
+    enabled: true
+    horizontal_radius: 0.1
+    vertical_radius: 0.3
+    upper_radius: 0.03
+    recover_highlights: true
+    protect_features: true
+  exclude_ellipses: []
+
+# 独立Haar开关，当前默认开启传统预训练人脸/眼睛定位。
+# 按组长2026-11-16评审，使用已锁定的opencv-python-headless包自带模型。
+# 通过importlib.resources读取cv2.data包资源并内存加载，支持中文安装路径。
+# models仅填写包内文件名。关闭spatial不会关闭本开关。
+# segmentation仅在定位可靠时运行，种子及搜索域随实际人脸框移动。
+# center_offset/roi_scale/seed_scale相对人脸框，其他比例由spatial子配置同名项解释。
+face_locator:
+  enabled: true
+  working_size: 512
+  models:
+    face_default: haarcascade_frontalface_default.xml
+    face_alt2: haarcascade_frontalface_alt2.xml
+    eyes: haarcascade_eye_tree_eyeglasses.xml
+  segmentation:
+    enabled: true
+    iterations: 3
+    gmm_iterations: 10
+    workers: 3
+    vote_threshold: 2
+    profiles:
+    - space: gray
+      working_size: 256
+      trusted: false
+      bright_seed: false
+    - space: bgr
+      working_size: 512
+      trusted: true
+      bright_seed: false
+    - space: bgr
+      working_size: 512
+      trusted: true
+      bright_seed: true
+    coverage_recovery:
+      enabled: true
+      working_size: 512
+      lower_quantile: 0.55
+      horizontal_padding: 0.25
+    surface:
+      enabled: true
+      horizontal_radius: 0.1
+      vertical_radius: 0.3
+      upper_radius: 0.03
+      recover_highlights: true
+      protect_features: true
+    center_offset:
+    - 0.5
+    - 0.37
+    roi_scale:
+    - 0.64
+    - 0.68
+    seed_scale:
+    - 0.24
+    - 0.32
+
+# 局部五官保护。宽/高/面积比例相对皮肤参考框，percentile范围0..100。
+# eyes使用眼框及双眼间距。brows局部位置相对眼框。mouth_holes位置相对人脸框。
+# close_kernel为[高度,宽度]正奇数，dilate_kernel为正奇数。缺省项沿用代码默认。
+features:
+  dark:
+    blackhat_width: 0.2
+    blackhat_height: 0.12
+    residual_min: 8.0
+    residual_percentile: 75.0
+    local_radius: 0.03
+    local_difference: 6.0
+    max_luminance_ratio: 0.55
+    search_bands:
+    - - 0.2
+      - 0.38
+    - - 0.38
+      - 0.56
+    close_kernel:
+    - 3
+    - 5
+    open_width: 0.03
+    min_width: 0.045
+    max_width: 0.5
+    min_aspect: 1.2
+    min_area: 0.0003
+    max_height: 0.15
+  lips:
+    local_radius: 0.06
+    residual_min: 0.015
+    residual_percentile: 85.0
+    redness_margin: 0.025
+    search_top: 0.68
+    search_bottom: 0.97
+    close_kernel:
+    - 5
+    - 9
+    min_width: 0.1
+    max_width: 0.55
+    min_height: 0.02
+    max_height: 0.2
+    min_aspect: 1.2
+    center_min_y: 0.72
+    group_y: 0.07
+    group_x: 0.3
+  eyes:
+    radius_width: 0.45
+    radius_height: 0.12
+    max_radius_x_distance: 0.24
+    max_radius_y_distance: 0.07
+  brows:
+    local_radius: 0.18
+    difference_min: 6.0
+    left_margin: 0.2
+    right_extent: 1.2
+    top_offset: 0.95
+    bottom_offset: 0.25
+    close_kernel:
+    - 3
+    - 5
+    min_width: 0.25
+    min_aspect: 1.3
+    min_area: 0.0005
+  mouth_holes:
+    search_top: 0.66
+    eye_offset: 0.34
+    center_x_radius: 0.24
+    center_max_y: 0.92
+    bbox_top: 0.61
+    bbox_bottom: 0.99
+    min_width: 0.055
+    max_width: 0.59
+    max_height: 0.2
+    min_aspect: 1.1
+    min_area: 0.00065
+    red_radius: 0.055
+    dark_radius: 0.04
+    red_percentile: 80.0
+    red_min: 0.01
+    dark_percentile: 60.0
+    dark_min: 8.0
+  dilate_kernel: 3
