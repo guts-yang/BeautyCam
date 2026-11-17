@@ -14,6 +14,17 @@
 
 在线演示：[beauty-cam.streamlit.app](https://beauty-cam.streamlit.app)（Streamlit Community Cloud，绑定 `main` 分支自动部署；上传图仅在进程内存处理，不持久化）。
 
+本分支已包含 B 板块的 M1–M4 实现、单元测试和离线评测工具。查看本 PR 的效果请在本地运行，对应实现与验证集中在 [B 板块实现与验证](report/b_modules.md)。
+
+| 模块 | 当前实现 | 参数 |
+| --- | --- | --- |
+| M1 肤色检测 | YCrCb 候选、Haar 人脸定位、图割分割与五官保护 | [skin_detect.yaml](config/skin_detect.yaml) |
+| M2 曝光改善 | CLAHE、自适应 Gamma、平滑曝光增量及过曝控制 | [exposure.yaml](config/exposure.yaml) |
+| M3 空间域平滑 | 双边滤波、小型暗结构修补、掩码边界融合 | [smooth.yaml](config/smooth.yaml) |
+| M4 频域增强 | FFT 高低频分离、细节回注和只读频率诊断 | [freq_enhance.yaml](config/freq_enhance.yaml) |
+
+固定 40 张最近一次测量中，M1 IoU 为 0.752956、Recall 为 0.903888，其他 B 模块的隔离定量结果见报告。M3/M4 人工评分和完整程序性能仍待验收。
+
 ## 项目约束基线（新成员请先读）
 
 本项目采用规范驱动开发（SDD），开发前必须先理解以下三份基线文档（位于 `docs/baseline/`）。它们定义了"什么事能做、怎么做"，任何实现都不得违反：
@@ -32,6 +43,8 @@
 
 模块归属口径（三板块，与 `docs/issue规划.md` 一致）：A（GitHub `guts-yang`）负责流程编排与入口（`core/`、`io/`、CLI、UI）；B（GitHub `qixing1227`）负责 M1–M4（`skin_detect`、`exposure`、`smooth`、`freq_enhance`）；C（GitHub `Shiqi0502`）负责 M5–M7（`restore`、`color`、`metrics`）。
 
+当前 M1 使用经授权采用的传统预训练 Haar 级联，模型随项目现有 OpenCV 依赖包提供。固定构图模式默认关闭，人脸框内分割随实际位置变化；Haar 的独立开关、可调参数、包资源加载和许可见 [B 板块说明](report/b_modules.md#m1-肤色检测)。
+
 ## 目录结构
 
 ```
@@ -47,7 +60,7 @@ BeautyCam/
 │   ├── 架构设计与任务分工规划.md  # 架构设计与任务拆分（工作分解，三板块版）
 │   ├── issue规划.md             # GitHub Issue 规划（8 Epic / 27 Issue，三板块解耦分工）
 ├── src/                        # 源码
-│   ├── main.py                 # CLI 薄入口（单图 / 批处理，preview/process/evaluation 三模式）
+│   ├── main.py                 # CLI 薄入口（单图 / 批处理，process/evaluation 模式）
 │   ├── app.py                  # Streamlit 薄入口（本地与云端演示共用）
 │   ├── prepare_data.py         # CelebAMask-HQ 数据预处理（fetch/subset/merge 三命令）
 │   └── beauty/                 # 主包（分层：core / io / modules / metrics）
@@ -62,12 +75,20 @@ BeautyCam/
 │       │   └── color.py        #   M6 白平衡与彩色增强
 │       └── metrics/            # M7 评价层（C）：metrics.py 计算 IoU/ΔE2000/EPI 等指标，纯计算不读写文件
 ├── tools/
-│   └── visualize_skin_mask.py  # 皮肤掩码可视化（面板图 / 联系表 / 统计 CSV）
+│   ├── evaluate_m1.py          # M1 IoU/Recall 与后处理开关对照
+│   ├── evaluate_m2.py          # M2 提亮、过曝与直方图
+│   ├── evaluate_m3.py          # M3 方差/EPI、三联图和人工评分表
+│   ├── evaluate_m4.py          # M4 高频/EPI、频谱与分层图
+│   ├── evaluate_b_composite.py # 实际 M1–M4 组合结果复查
+│   ├── benchmark_b.py          # 固定清单上的 B 四阶段计时
+│   ├── prepare_b_review.py     # 整理 M3/M4 离线人工评审材料
+│   ├── inspect_haar_models.py  # 查看 OpenCV 包内 Haar 资源与来源
+│   └── visualize_skin_mask.py  # 已有皮肤掩码可视化
 ├── tests/
 │   ├── unit/                   # 单元测试与契约守卫（合成数据，不需要数据集）
 │   └── integration/            # 数据集评测回归（需本地数据与 manifest）
 ├── config/                     # pipeline.yaml（阶段开关与顺序）+ 各模块独立参数 YAML
-├── .github/workflows/          # CI：单元/契约/集成三 job 回归流水线
+├── .github/workflows/          # CI：单元/契约与端到端两类 job，各覆盖 Python 3.10/3.12
 ├── .streamlit/config.toml      # Streamlit 主题映射
 ├── assets/
 │   ├── canvas.png              # 项目总览封面图（README 顶部引用）
@@ -78,7 +99,7 @@ BeautyCam/
 │   ├── input/                  # 输入素材：CelebAMask-HQ 原始数据与 subset/ 抽样子集
 │   └── output/                 # 处理结果图（按 run_id 分目录）
 ├── results/                    # 评测数据（指标 CSV）与结论，不入版本管理
-├── report/                     # 课程设计报告（figures/ 为图表素材）
+├── report/                     # B 统一说明 b_modules.md、资源许可及 figures/ 图表素材
 ├── slides/                     # 答辩 PPT
 ├── .gitignore
 └── README.md
@@ -120,6 +141,8 @@ BeautyCam/
 6. 彩色增强与白平衡
 7. 评价与输出
 
+主流程实际执行顺序为 **M5 → M1 → M2 → M3 → M4 → M6**，评价由 M7 处理。M5 默认关闭，阶段开关由 `config/pipeline.yaml` 管理。
+
 ## 数据集
 
 ### 候选方案评估
@@ -143,7 +166,7 @@ BeautyCam/
 
 主数据集为 CelebAMask-HQ。选型的核心逻辑：本课题是纯传统图像处理、不训练任何模型，对数据集的要求不是"量大"，而是"有没有皮肤区域的标准答案"。CelebAMask-HQ 是候选中唯一同时满足"高分辨率 + 自带皮肤掩码 + 公开可获取"三个条件的选项，理由：
 
-- 自带 19 类语义掩码，其中索引 1 即皮肤区域，可直接作为肤色检测的标准答案（GT），用于限定磨皮作用域并量化肤色检测准确率；
+- 自带 19 类语义掩码，其中索引 1 为皮肤区域，用于 M1 评分和 M2–M4 隔离评测；实际美颜处理使用 M1 的预测掩码；
 - 1024x1024 高分辨率，便于观察磨皮与细节增强效果；
 - 覆盖多年龄、多肤色、多光照与遮挡场景，便于鲁棒性验证；
 - 效果可验证："肤色保护"这一目标由此可以量化为 IoU / 准确率 / 召回率，验收不靠主观印象。
@@ -152,7 +175,7 @@ BeautyCam/
 
 ### 数据子集筛选
 
-课设不训练深度模型，无需全量数据，因此对数据集做了二次筛选：从 30,000 张中抽取 20~50 张工作子集，按场景分层覆盖，保证每类退化都有对应样本。
+当前固定清单包含 40 张工作样本。`scene` 仍是待人工核验的占位标签，下列场景作为后续核验目标。
 
 | 筛选维度 | 对应验证目标 |
 | --- | --- |
@@ -189,35 +212,54 @@ python src/prepare_data.py merge --root data/input/CelebAMask-HQ --ids 10507,113
 
 ## 快速开始
 
-环境要求 Python 3.10.x。所有直接依赖已精确 pin 在 `requirements.txt`。
+使用 Python 3.10 或 3.12，依赖版本见 [requirements.txt](requirements.txt)。在仓库根目录执行。
+
+Windows PowerShell 可直接调用虚拟环境解释器。当前 CLI 写图层在 Windows 下要求输出路径仅含 ASCII 字符，下面使用临时目录；若账户目录含中文，请改用其他可写的 ASCII 路径。
+
+```powershell
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$outputRoot = Join-Path $env:TEMP "BeautyCamOutput"
+.\.venv\Scripts\python.exe src/main.py --input assets/test-images/lena512.BMP --mode process --output-root $outputRoot
+.\.venv\Scripts\python.exe -m streamlit run src/app.py
+```
+
+macOS / Linux 使用以下方式。
 
 ```bash
-# 1. 创建虚拟环境并安装依赖
-python3.10 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt
+python src/main.py --input assets/test-images/lena512.BMP --mode process
+python -m streamlit run src/app.py
+```
 
-# 2. 单图处理（结果写入 data/output/<run_id>/）
-python src/main.py --input assets/test-images/lena512.BMP
+CLI 单图和批处理结果写入 `data/output/<run_id>/samples/<sample_id>/`，失败记录位于 `results/<run_id>/failures.csv`。`--output-root` 可以指定产物根目录。Windows 下批处理和评价同样应指定 ASCII 输出路径。CLI 支持 `process` 和 `evaluation`；UI 预览通过主流程的 `preview` 模式在内存运行。
 
-# 3. 目录批处理（失败项写入 results/<run_id>/failures.csv 后继续）
+```bash
+# 目录批处理，需要先准备本地工作子集
 python src/main.py --input data/input/subset/images
 
-# 4. 在线演示（推荐，无需本地环境）
-#    打开 https://beauty-cam.streamlit.app 即可交互
-#    本地运行作为离线兜底：
-streamlit run src/app.py
-
-# 5. 单元测试与契约守卫（不需要数据集）
-python -m pytest -m "not integration and not end_to_end"
-
-# 6. 端到端集成回归（合成数据 + 临时目录，不需要数据集，CI 常跑）
-python -m pytest -m end_to_end
-
-# 7. 数据集评测回归（需先准备本地数据集与固定 manifest）
-export BEAUTYCAM_DATA_ROOT=data/input/subset
-python -m pytest -m integration
+# 单图评价，GT 只作为评价区域
+python src/main.py --input data/input/subset/images/6277.jpg --skin-mask data/input/subset/skin_masks/6277.png --mode evaluation
 ```
+
+## B 模块评测与图表
+
+准备好本地 40 张工作子集后运行。下列输出目录应使用新的名称。
+
+```bash
+python tools/evaluate_m1.py --output results/m1_recheck
+python tools/evaluate_m2.py --output results/m2_recheck
+python tools/evaluate_m3.py --output results/m3_recheck
+python tools/evaluate_m4.py --output results/m4_recheck
+python tools/evaluate_b_composite.py --output results/b_composite_recheck
+python tools/benchmark_b.py --output results/b_timing_recheck
+```
+
+结果包括逐图 CSV、`summary.json`、原尺寸输出和图表。M2 提供直方图，M3 提供三联图和 ROI 评分表，M4 提供低频/高频诊断及频谱图。方法、指标口径、人工验收和材料生成命令集中在 [B 板块实现与验证](report/b_modules.md)。
+
+可运行 `python tools/inspect_haar_models.py` 检查依赖包内的 Haar 资源。`evaluate_m1.py` 至 `evaluate_m4.py` 的退出码反映相应定量门槛；组合复查和计时脚本的成功退出表示执行完成，人工项另行评分。
 
 配置位于 `config/`：`pipeline.yaml` 放固定顺序、阶段开关与运行模式；各模块参数放独立 YAML。参数覆盖优先级为代码默认值 < YAML < 本次 CLI/UI 显式覆盖。
 
@@ -230,4 +272,10 @@ python -m pytest -m integration
 - 数据集评测回归（`pytest -m integration`）：需本地数据集与固定 manifest；未配置 `BEAUTYCAM_DATA_ROOT` 时明确跳过，不伪装为通过。
 - 回归基线分契约、数值、图像三类；失败不得用 `skip`/`xfail`/放宽阈值规避，基线变更走 `change-request`。
 
-CI 见 `.github/workflows/tests.yml`，含 `unit-regression`、`contract-guard`、`integration-regression` 三个 job，统一在 Ubuntu + Python 3.10.x 执行。`main` 已开启分支保护：上述前两个 job 为必需状态检查，合并需经 PR，禁止直接 push 与强推。
+提交前执行项目约定的本地检查。
+
+```bash
+python -m pytest -m "not integration" -q
+```
+
+CI 配置见 [.github/workflows/tests.yml](.github/workflows/tests.yml)。`unit-regression` 包含单元测试与契约检查，`integration-regression` 跑端到端用例；两类 job 各覆盖 Python 3.10.x 和 3.12.x，共四项检查。工作流支持 PR、push 到 main 和手动触发。合并由 A 统一评审处理。

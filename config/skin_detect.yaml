@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # M1肤色检测（B / qixing1227）
 # 默认路径为YCrCb候选、Haar脸框内图割、五官保护与掩码清理。
-# 见report/lht_review_fixes_20261116.md。
+# 实现、评测和复现方式见report/b_modules.md。
 
 # OpenCV通道顺序为Y、Cr、Cb，下面仅限制色度。
 ycbcr:

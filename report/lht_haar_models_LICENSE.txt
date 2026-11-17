@@ -4,7 +4,7 @@ Models: haarcascade_frontalface_default.xml; haarcascade_frontalface_alt2.xml; h
 Local source: opencv-python-headless 4.10.0.84, cv2/data (OpenCV 4.10.0).
 Current implementation loads the original XML files from the installed cv2.data package. Each file retains its original licence comments. Model XML is no longer embedded in the YAML configuration.
 Face models created by Rainer Lienhart. Eye model created by Shameem Hameed.
-Upstream references and SHA256 values are recorded in report/lht_haar_20261031.md and report/lht_review_fixes_20261116.md. Run tools/inspect_haar_models.py to inspect the installed package resources.
+Implementation and provenance are documented in report/b_modules.md. Run tools/inspect_haar_models.py to inspect the installed package version, SHA256 values and original licence headers.
 
   IMPORTANT: READ BEFORE DOWNLOADING, COPYING, INSTALLING OR USING.
 
