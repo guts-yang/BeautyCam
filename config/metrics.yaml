@@ -29,3 +29,22 @@ protocol:
   epsilon: 1.0e-6
   hf_sigma: 3.0
   border_type: BORDER_REFLECT_101
+  float_tolerance: 1.0e-6
+
+# 模块隔离评测的固定合成退化参数（与 config_id 一起记录）
+degradation:
+  motion_blur:
+    psf_length: 15
+    psf_angle: 0.0
+    noise_sigma: 0.01
+    seed: 42
+  color_cast:
+    rgb_gains: [1.25, 0.90, 0.75]
+
+# 匿名问卷只返回汇总数据；CSV 持久化仍由 A 的 io 层负责
+survey:
+  minimum_valid_responses: 20
+  expected_pairs: 10
+  score_min: 1
+  score_max: 5
+  questions: [naturalness, texture_preservation, facial_detail, skin_tone]
