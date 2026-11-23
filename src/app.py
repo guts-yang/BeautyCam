@@ -79,12 +79,12 @@ def main() -> None:
         col_left, col_right = st.columns(2)
         with col_left:
             st.subheader("原图")
-            st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_container_width=True)
+            st.image(cv2.cvtColor(image, cv2.COLOR_BGR2RGB), use_column_width=True)
         with col_right:
             st.subheader("处理后")
             if result.succeeded and result.final_bgr is not None:
                 st.image(cv2.cvtColor(result.final_bgr, cv2.COLOR_BGR2RGB),
-                         use_container_width=True)
+                         use_column_width=True)
             else:
                 st.error(result.status_text())
 
