@@ -53,3 +53,4 @@ results/
 .pytest_cache/
 .coverage
 htmlcov/
+.agent
