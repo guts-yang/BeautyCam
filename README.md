@@ -10,7 +10,7 @@
 
 > **本项目为《数字图像处理》课程设计（大作业）作品**：以传统图像处理方法实现一个人脸美颜相机，在不使用深度学习的前提下，完成肤色保护、曝光改善、保边磨皮与细节增强。
 
-**📄 [点击查看课程知识点图文解答网页（GitHub Pages）](https://guts-yang.github.io/BeautyCam/)** —— 按课程知识点逐条给出概念、公式、源码实现位置与效果对照，是本作业的核心说明文档。
+**📄 [点击查看课程知识点图文解答网页（GitHub Pages）](https://guts-yang.github.io/BeautyCam/)** —— 按课程知识点逐条给出概念、公式与效果对照，是本作业的核心说明文档。
 
 在线演示：[beauty-cam.streamlit.app](https://beauty-cam.streamlit.app)（Streamlit Community Cloud 自动部署；上传图片仅在进程内存中处理，不持久化保存）。
 
@@ -51,34 +51,36 @@
 
 ## 三、核心算法原理简述
 
-**肤色检测（M1）**：在 YCrCb 空间用色度阈值 `133 ≤ Cr ≤ 173, 77 ≤ Cb ≤ 127` 生成肤色候选，再用 Haar 级联定位人脸框，在框内用 GrabCut（GMM 建模）分割前景，并排除眉、眼、唇区域。分割结果经形态学与小连通域过滤得到皮肤掩码。
+**肤色检测（M1）**：在 YCrCb 空间用色度阈值 $\,133 \le \mathrm{Cr} \le 173,\ 77 \le \mathrm{Cb} \le 127\,$ 生成肤色候选，再用 Haar 级联定位人脸框，在框内用 GrabCut（GMM 建模）分割前景，并排除眉、眼、唇区域。分割结果经形态学与小连通域过滤得到皮肤掩码。其中 $\mathrm{Cr},\mathrm{Cb}$ 为红色度与蓝色度；人类肤色在色度空间聚集于特定区间，且不同光照主要改变亮度 $Y$ 而较少改变色度，因此用色度阈值筛选肤色对明暗变化相对稳定。
 
 **曝光改善（M2）**：先在皮肤区域估计缓变亮度基底，执行 CLAHE 增强后，用自适应伽马曲线把平均亮度推向目标：
 
-```
-Y_out = 255 · (Y_in / 255)^exponent
-desired = min(mean + gain·(target_y − mean), mean·max_gain)
-```
+$$
+Y_{\text{out}} = 255\left(\frac{Y_{\text{in}}}{255}\right)^{\gamma},\qquad
+Y_t = \min\!\left(\bar Y + g\,(Y_{\text{target}}-\bar Y),\ \bar Y\cdot g_{\max}\right)
+$$
 
-处理后在实际输出上检查过曝比例，超标则二分减弱提升强度。
+其中 $Y_{\text{in}},Y_{\text{out}}$ 为变换前后的亮度，$\gamma$ 为伽马指数（$\gamma<1$ 时提亮），$\bar Y$ 为当前皮肤区域的平均亮度，$Y_{\text{target}}$ 与 $Y_t$ 分别为期望目标和实际采用的目标亮度，$g$ 为向目标靠拢的比例，$g_{\max}$ 为亮度放大倍率上限。物理含义是用幂次曲线把偏暗的皮肤抬升到自然亮度，同时通过限幅避免整体过曝。处理后还会检查过曝比例，超标则二分减弱提升强度。
 
 **保边平滑（M3）**：双边滤波同时考虑空间距离与颜色相似度，平滑皮肤而保留五官边缘：
 
-```
-w(p,q) = exp(−‖p−q‖²/2σ_s²) · exp(−‖I(p)−I(q)‖²/2σ_c²)
-```
+$$
+w(p,q)=\exp\!\left(-\frac{\lVert p-q\rVert^2}{2\sigma_s^2}\right)\cdot\exp\!\left(-\frac{\lVert I(p)-I(q)\rVert^2}{2\sigma_c^2}\right)
+$$
 
-并用 Otsu 阈值与连通域分析只修补小型暗点，融合权重随掩码内距离衰减。
+其中 $p,q$ 为中心像素与邻域像素的位置，$I(\cdot)$ 为像素值，$w(p,q)$ 为邻域像素的权重，$\sigma_s$ 为空间域标准差（控制邻域范围），$\sigma_c$ 为颜色域标准差（控制颜色相近程度）。空间项让近邻像素权重大从而平滑噪声，颜色项让颜色相近者权重大、跨越边缘时权重迅速衰减，二者相乘即"保边平滑"——恰好满足磨皮但不糊五官的需求。此外还用 Otsu 阈值与连通域分析只修补小型暗点，融合权重随掩码内距离衰减。
 
 **频域增强（M4）**：用二维 FFT 与高斯低通函数分离亮度的高低频，再按增益回注细节：
 
-```
-H(fx,fy) = exp(−2π²σ²(fx²+fy²))
-low = irfft2(rfft2(Y)·H),  high = Y − low
-Y_out = lowpass_gain·low + highpass_gain·high
-```
+$$
+H(f_x,f_y)=\exp\!\left[-2\pi^2\sigma^2(f_x^2+f_y^2)\right],\qquad
+\text{low}=\mathcal{F}^{-1}\{\mathcal{F}(Y)\,H\},\quad \text{high}=Y-\text{low},\quad
+Y_{\text{out}}=g_l\,\text{low}+g_h\,\text{high}
+$$
 
-> 更多知识点、公式与源码对应位置，请见 [课程知识点解答网页](https://guts-yang.github.io/BeautyCam/)。
+其中 $f_x,f_y$ 为水平与垂直频率（周期/像素），$\sigma$ 为高斯低通的空间尺度，$H(f_x,f_y)$ 为低通传递函数（$H(0,0)=1$ 保证平均亮度不变），$\mathcal{F}$ 与 $\mathcal{F}^{-1}$ 为傅里叶变换及其逆变换，$Y$ 为亮度，$\text{low}$ 与 $\text{high}$ 为低频与高频分量，$g_l,g_h$ 为两者增益。由于 $\text{low}+\text{high}=Y$，当 $g_l=g_h=1$ 时输出与原图一致；增大 $g_h$ 增强细节（锐化），减小 $g_h$ 抑制细节（磨皮）。
+
+> 更多知识点、公式与变量说明，请见 [课程知识点解答网页](https://guts-yang.github.io/BeautyCam/)。
 
 ## 四、效果展示
 
