@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BeautyCam · 数字图像处理课程设计知识点解答</title>
+<meta name="description" content="BeautyCam 人脸美颜相机课程设计——《数字图像处理》知识点图文解答，含 LaTeX 公式、变量解释、物理意义与效果对照。">
+<meta name="generator" content="ARIS /render-html — bespoke GitHub Primer single-file view">
+<meta name="aris:source-repo" content="guts-yang/BeautyCam">
+<meta name="aris:generated-at" content="2026-11-26">
+
+<script>
+window.MathJax = {
+  tex: { inlineMath: [['$','$']], displayMath: [['$$','$$']] },
+  options: { skipHtmlTags: ['script','noscript','style','textarea','pre','code'] }
+};
+</script>
+<script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+:root{
+  --bg:#ffffff;--canvas:#f6f8fa;--ink:#24292f;--muted:#57606a;--link:#0969da;
+  --border:#d0d7de;--border-muted:#d8dee4;--green:#1a7f37;--green-bg:#dafbe1;
+  --blue-bg:#ddf4ff;--blue-border:#54aeff;--yellow-bg:#fff8c5;--yellow-border:#d4a72c;
+  --purple-bg:#fbefff;--purple-border:#8250df;--header:#24292f;--code-bg:#f6f8fa;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--ink);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,"PingFang SC","Microsoft YaHei",sans-serif;
+  font-size:16px;line-height:1.6}
+a{color:var(--link);text-decoration:none}
+a:hover{text-decoration:underline}
+
+.gh-header{background:var(--header);color:#fff;height:62px;display:flex;align-items:center;gap:14px;padding:0 24px;font-size:14px}
+.gh-header .gh-logo{width:28px;height:28px;border:2px solid #fff;border-radius:50%;display:grid;place-items:center;font-weight:700;font-size:13px}
+.gh-header .gh-crumb{opacity:.72}
+.gh-header .gh-crumb b{color:#fff;opacity:1;font-weight:600}
+.gh-header .spacer{flex:1}
+.gh-header .pill{border:1px solid rgba(255,255,255,.4);border-radius:2em;padding:2px 10px;font-size:12px;opacity:.9}
+.gh-repo-bar{background:var(--canvas);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}
+.gh-repo-bar .repo-name{font-weight:600;font-size:16px}
+.gh-repo-bar .public{border:1px solid var(--border);border-radius:2em;padding:0 7px;font-size:11px;color:var(--muted);margin-left:2px}
+.gh-repo-bar .tabs{display:flex;margin-left:18px;gap:2px;flex-wrap:wrap}
+.gh-repo-bar .tab{padding:10px 10px;border-bottom:2px solid transparent;color:var(--muted)}
+.gh-repo-bar .tab.active{border-bottom-color:#fd8c73;font-weight:600;color:var(--ink)}
+.gh-repo-bar .assign-badge{margin-left:auto;font-size:12px;background:#0969da;color:#fff;border-radius:2em;padding:3px 11px;font-weight:600}
+
+.wrap{max-width:1280px;margin:0 auto;padding:24px;display:grid;grid-template-columns:224px minmax(0,1fr);gap:32px}
+nav.toc{position:sticky;top:16px;align-self:start;max-height:calc(100vh - 32px);overflow:auto;font-size:13px;border:1px solid var(--border);border-radius:6px;padding:14px 10px;background:var(--bg)}
+nav.toc h3{margin:0 0 8px;padding:0 8px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+nav.toc ol{list-style:none;margin:0;padding:0;counter-reset:t}
+nav.toc li{margin:2px 0;counter-increment:t}
+nav.toc li a{display:block;padding:4px 8px;border-radius:4px;color:var(--ink)}
+nav.toc li a:hover{background:var(--canvas);text-decoration:none}
+nav.toc li a::before{content:counter(t) ". ";color:var(--muted)}
+
+.markdown-body{min-width:0;max-width:920px}
+.markdown-body h1,.markdown-body h2,.markdown-body h3{border-bottom:1px solid var(--border);padding-bottom:.3em;line-height:1.25}
+.markdown-body h1{font-size:28px;border-bottom:none;margin:6px 0 4px}
+.markdown-body h2{font-size:22px;margin:36px 0 16px}
+.markdown-body h3{font-size:17px;border-bottom:none;margin:26px 0 10px;color:var(--ink)}
+.markdown-body p{margin:10px 0}
+.markdown-body ul,.markdown-body ol{padding-left:24px;margin:10px 0}
+.markdown-body li{margin:4px 0}
+.markdown-body strong{font-weight:600}
+.markdown-body code{font-family:ui-monospace,SFMono-Regular,SF Mono,Menlo,Consolas,monospace;font-size:85%;background:rgba(175,184,193,.2);border-radius:6px;padding:.15em .4em}
+.markdown-body table{border-collapse:collapse;width:100%;margin:14px 0;font-size:14px;display:block;overflow-x:auto}
+.markdown-body th,.markdown-body td{border:1px solid var(--border);padding:7px 12px;vertical-align:top}
+.markdown-body th{background:var(--canvas);font-weight:600;white-space:nowrap}
+.markdown-body tbody tr:nth-child(even){background:#f6f8fa}
+.markdown-body figure{margin:16px 0;border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#fff}
+.markdown-body figure img{display:block;width:100%;height:auto}
+.markdown-body figcaption{padding:9px 14px;font-size:13px;color:var(--muted);background:var(--canvas);border-top:1px solid var(--border)}
+.markdown-body hr{border:0;border-top:1px solid var(--border);margin:28px 0}
+.markdown-body p.math{text-align:center;margin:16px 0;font-size:17px;overflow-x:auto}
+.markdown-body .meaning{background:var(--canvas);border-left:3px solid var(--green);border-radius:6px;padding:10px 16px;margin:12px 0;font-size:14px}
+.markdown-body .meaning strong{color:var(--green)}
+
+.alert{border-left:4px solid var(--blue-border);background:var(--blue-bg);border-radius:6px;padding:12px 16px;margin:16px 0;font-size:14px}
+.alert .alert-title{font-weight:600;margin-bottom:4px}
+.alert.tip{border-left-color:var(--green);background:var(--green-bg)}
+.alert.important{border-left-color:var(--purple-border);background:var(--purple-bg)}
+.alert.warn{border-left-color:var(--yellow-border);background:var(--yellow-bg)}
+.alert p:last-child{margin-bottom:0}
+.alert ul{margin:6px 0 0}
+
+.assignment{background:linear-gradient(180deg,#f6f8fa,#fff);border:1px solid var(--border);border-radius:8px;padding:18px 20px;margin:18px 0 8px}
+.assignment h2{margin-top:0;border-bottom:none;font-size:20px}
+.kv{display:grid;grid-template-columns:112px 1fr;gap:6px 14px;font-size:14px;margin-top:10px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0}
+.badge{display:inline-block;border-radius:2em;padding:2px 9px;font-size:11px;font-weight:600;background:var(--canvas);border:1px solid var(--border);color:var(--muted)}
+.badge.g{background:var(--green-bg);border-color:#4ac26b;color:#116329}
+.badge.b{background:var(--blue-bg);border-color:#54aeff;color:#0550ae}
+.meta-strip{font-size:12px;color:var(--muted);border-top:1px solid var(--border);padding-top:12px;margin-top:8px}
+footer.page-footer{border-top:1px solid var(--border);margin-top:48px;padding-top:16px;font-size:12px;color:var(--muted)}
+.totop{float:right;font-size:12px}
+@media(max-width:900px){
+  .wrap{grid-template-columns:1fr;padding:14px}
+  nav.toc{position:static;max-height:none}
+  .gh-repo-bar .assign-badge{margin-left:0}
+}
+@media print{
+  nav.toc,.gh-repo-bar .tabs,.totop{display:none}
+  .wrap{display:block;padding:0}
+  body{font-size:12px}
+  .markdown-body h2{page-break-after:avoid}
+  figure,table,.alert{page-break-inside:avoid}
+}
+</style>
+</head>
+<body>
+
+<header class="gh-header">
+  <div class="gh-logo">GH</div>
+  <div class="gh-crumb"><b>guts-yang</b> / <b>BeautyCam</b></div>
+  <div class="spacer"></div>
+  <div class="pill">Public · 课程设计作业</div>
+</header>
+<div class="gh-repo-bar">
+  <span class="repo-name">BeautyCam</span><span class="public">Public</span>
+  <nav class="tabs">
+    <a class="tab" href="https://github.com/guts-yang/BeautyCam">Code</a>
+    <a class="tab active" href="#top">知识点解答</a>
+    <a class="tab" href="#references">参考资料</a>
+  </nav>
+  <span class="assign-badge">《数字图像处理》课程设计</span>
+</div>
+
+<div class="wrap" id="top">
+<nav class="toc">
+  <h3>本页目录</h3>
+  <ol>
+    <li><a href="#overview">课程设计作业说明</a></li>
+    <li><a href="#fundamentals">数字图像基础与色彩空间</a></li>
+    <li><a href="#enhancement">图像增强：CLAHE 与伽马</a></li>
+    <li><a href="#filtering">图像滤波与去噪</a></li>
+    <li><a href="#segmentation">图像分割与人脸区域</a></li>
+    <li><a href="#blending">图像融合与掩膜</a></li>
+    <li><a href="#geometry">几何变换与区域自适应</a></li>
+    <li><a href="#sharpening">图像锐化与频域增强</a></li>
+    <li><a href="#color">色彩与美白调整</a></li>
+    <li><a href="#restoration">图像复原：维纳反卷积</a></li>
+    <li><a href="#evaluation">图像质量评价</a></li>
+    <li><a href="#references">参考资料</a></li>
+  </ol>
+</nav>
+
+<main class="markdown-body">
+
+<h1>《数字图像处理》课程设计知识点解答</h1>
+<p style="color:var(--muted);margin-top:0">本页围绕 <strong>BeautyCam 人脸美颜相机</strong> 这一课程设计载体，系统讲解其中涉及的《数字图像处理》核心知识原理。每个知识点均给出数学公式、逐变量解释与式子的物理意义，并配效果对照。页面聚焦原理本身，不涉及工程实现细节。</p>
+
+<div class="alert tip">
+  <div class="alert-title">如何阅读本页</div>
+  每个知识点按 <strong>概念定义 → 数学公式与变量解释 → 效果说明</strong> 三段组织。所有公式均以 LaTeX 排版（由 MathJax 渲染），每个符号都给出含义，每个式子都说明其物理意义。若页面离线打开，公式会退化为 LaTeX 源码文本，联网后自动渲染为数学公式。
+</div>
+
+<section class="assignment" id="overview">
+  <h2>课程设计作业说明</h2>
+  <dl class="kv">
+    <dt>课程名称</dt><dd>《数字图像处理》（本科课程设计 / 大作业）</dd>
+    <dt>作业题目</dt><dd>人脸美颜相机 —— 肤色保护与细节增强</dd>
+    <dt>实现语言</dt><dd>Python 3.10 / 3.12</dd>
+    <dt>技术路线</dt><dd>全程传统图像处理方法，不训练深度学习模型</dd>
+    <dt>涉及知识点</dt><dd>色彩空间、直方图增强、伽马校正、双边滤波、阈值分割、图割、形态学、掩膜融合、仿射变换、频域滤波、白平衡、维纳复原、图像质量评价</dd>
+    <dt>提交信息</dt><dd>课程名称、姓名、学号、提交日期见 README 占位符处填写</dd>
+  </dl>
+  <div class="meta-strip">
+    <span class="badge b">LaTeX 公式渲染</span>
+    <span class="badge b">单文件 HTML</span>
+    <span class="badge g">变量与物理意义逐条解释</span>
+    <span class="badge g">效果为真实运行截图</span>
+  </div>
+</section>
+
+<h2 id="fundamentals">1. 数字图像基础与色彩空间</h2>
+<h3>概念定义</h3>
+<p>数字图像是对连续场景进行空间采样与幅度量化后得到的二维矩阵。灰度图像每个像素用一个亮度值表示，彩色图像则用多个通道描述。为了把「亮度」与「颜色」分开处理，常把 RGB 转换到 <strong>YCrCb / YUV</strong> 家族：其中 $Y$ 表示亮度，$\mathrm{Cr}$、$\mathrm{Cb}$ 表示色度。此外，HSV 用色调、饱和度、明度描述颜色，CIE Lab 则是接近人眼感知的均匀色空间。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$Y = 0.299\,R + 0.587\,G + 0.114\,B$$</p>
+<p class="math">$$\mathrm{Cr} = 0.500\,R - 0.419\,G - 0.081\,B + 128,\qquad \mathrm{Cb} = -0.169\,R - 0.331\,G + 0.500\,B + 128$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$R,\,G,\,B$</td><td>红、绿、蓝三通道的像素值，8 位图像中取 $0\sim255$</td></tr>
+    <tr><td>$Y$</td><td>亮度（luma），表示人眼感知的明暗程度</td></tr>
+    <tr><td>$\mathrm{Cr},\,\mathrm{Cb}$</td><td>红色度与蓝色度，描述颜色偏离灰色的程度；$+128$ 是为避免负数而引入的零偏置</td></tr>
+    <tr><td>$0.299,\,0.587,\,0.114$</td><td>亮度权重系数，来自 ITU-R BT.601 标准</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>人眼对绿色最敏感、对蓝色最不敏感，因此绿色权重最大（0.587）、蓝色最小（0.114），这样加权得到的 $Y$ 更接近人眼主观亮度。把图像拆成「亮度 + 色度」后，就可以只调整明暗而不改变颜色本身——这是后续所有增强与平滑操作的基础。</div>
+
+<h3>效果说明</h3>
+<p>亮度与色度分离后，处理可以被限制在皮肤区域内进行，从而避免「提亮皮肤时顺便改变肤色」。下面的四联图依次展示原图、皮肤区域、蒙版预览与最终输出，可以看到处理严格作用于人脸皮肤区域。</p>
+<figure><img src="assets/real_compare.png" alt="真实人脸处理前后对照：原图、皮肤掩码、蒙版预览、最终输出"><figcaption>图 1　真实人脸处理流程对照（项目运行截图）</figcaption></figure>
+
+<h2 id="enhancement">2. 图像增强：直方图均衡化与伽马校正</h2>
+<h3>概念定义</h3>
+<p>直方图描述图像中各灰度级出现的频率。<strong>直方图均衡化</strong>通过累积分布函数把灰度重新映射，使动态范围展开、对比度提高；<strong>CLAHE</strong>（限制对比度自适应直方图均衡）把图像分块后分别均衡，并限制每个直方图的高度，避免局部噪声被过度放大。<strong>伽马校正</strong>是一种幂次灰度变换，通过改变曲线的凹凸来控制整体明暗。</p>
+
+<h3>数学公式与变量解释</h3>
+<p>直方图均衡化的灰度映射（离散形式）：</p>
+<p class="math">$$s_k = (L-1)\sum_{j=0}^{k} p_r(r_j),\qquad p_r(r_j)=\frac{n_j}{MN}$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$r_j$</td><td>输入图像第 $j$ 级灰度（$j=0,\dots,L-1$）</td></tr>
+    <tr><td>$s_k$</td><td>映射后的输出灰度</td></tr>
+    <tr><td>$p_r(r_j)$</td><td>第 $j$ 级灰度出现的概率，$n_j$ 为该级像素数，$MN$ 为图像总像素数</td></tr>
+    <tr><td>$L$</td><td>灰度级数，8 位图像为 256</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>累积分布函数把原本集中在窄范围内的灰度「拉伸」到整个 $0\sim L-1$ 区间，使暗区细节显现、对比度增强。CLAHE 进一步把图像分成小块各自做这个映射，并用裁剪上限限制 $p_r$ 的最大值，从而增强局部细节而不至于把噪声放大成斑点。</div>
+
+<p>伽马校正与自适应目标亮度：</p>
+<p class="math">$$Y_{\text{out}} = 255\left(\frac{Y_{\text{in}}}{255}\right)^{\gamma},\qquad \gamma = \min\!\left(1,\; \frac{\ln(Y_t/255)}{\ln(\bar Y/255)}\right)$$</p>
+<p class="math">$$Y_t = \min\!\left(\bar Y + g\,(Y_{\text{target}}-\bar Y),\;\bar Y\cdot g_{\max}\right)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$Y_{\text{in}},\,Y_{\text{out}}$</td><td>变换前后的像素亮度（$0\sim255$）</td></tr>
+    <tr><td>$\gamma$</td><td>伽马指数；$\gamma&lt;1$ 使曲线上凸、图像变亮，$\gamma=1$ 为恒等变换</td></tr>
+    <tr><td>$\bar Y$</td><td>当前皮肤区域的平均亮度</td></tr>
+    <tr><td>$Y_{\text{target}},\,Y_t$</td><td>期望达到的目标亮度与实际采用的目标亮度</td></tr>
+    <tr><td>$g,\,g_{\max}$</td><td>向目标靠拢的比例，以及允许的最大亮度放大倍率（限幅）</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>幂次曲线通过指数 $\gamma$ 控制中间调的分布——小于 1 时把暗部抬亮、大于 1 时压暗。这里让 $\gamma$ 自适应地由当前平均亮度 $\bar Y$ 与目标亮度共同决定，使偏暗的皮肤被提升到自然亮度；再用 $g_{\max}$ 限制放大倍率，避免整体过曝而失去肤色细节。</div>
+
+<div class="alert note">
+  <div class="alert-title">Note · 提亮与过曝保护</div>
+  实测中，真实欠曝样本（皮肤区平均亮度低于 90）相对提亮约 <strong>20.8%</strong>，处理后亮度超过 250 的像素比例为 <strong>0</strong>，满足「提亮充分且不过曝」的要求；输入本身已过曝时不强行处理。
+</div>
+<figure><img src="assets/underexposed_compare.png" alt="欠曝人脸提亮对照：原图、皮肤区域、蒙版、提亮结果"><figcaption>图 2　欠曝样本提亮效果：原图 → 皮肤区域 → 蒙版预览 → 输出</figcaption></figure>
+
+<h2 id="filtering">3. 图像滤波与去噪</h2>
+<h3>概念定义</h3>
+<p>滤波是在像素邻域内按一定权重重新估计中心像素值。均值与高斯滤波按位置加权，能平滑噪声但会模糊边缘；中值滤波取邻域中值，对椒盐噪声鲁棒；<strong>双边滤波</strong>在位置权重之外再引入颜色相似度权重，因此可以「平滑平坦区域、保留颜色突变边缘」，这正是磨皮时保护五官的关键。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$I_{\text{out}}(p)=\frac{\sum_{q} w(p,q)\,I(q)}{\sum_{q} w(p,q)}$$</p>
+<p class="math">$$w(p,q)=\exp\!\left(-\frac{\lVert p-q\rVert^2}{2\sigma_s^2}\right)\cdot\exp\!\left(-\frac{\lVert I(p)-I(q)\rVert^2}{2\sigma_c^2}\right)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$p,\,q$</td><td>中心像素与其邻域像素的位置坐标</td></tr>
+    <tr><td>$I(\cdot)$</td><td>像素的亮度或颜色值</td></tr>
+    <tr><td>$w(p,q)$</td><td>邻域像素对中心像素的贡献权重</td></tr>
+    <tr><td>$\sigma_s$</td><td>空间域标准差，控制「多远算近邻」</td></tr>
+    <tr><td>$\sigma_c$</td><td>颜色域标准差，控制「多像算同类颜色」</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>第一个指数项（空间项）让距离近的像素权重大，产生平滑效果；第二个指数项（颜色项）让颜色相近的像素权重大，跨过边缘时颜色差异大、权重迅速衰减，于是边缘被保留。两者相乘即「保边平滑」，恰好满足磨皮但不糊五官的需求。</div>
+
+<p>中值滤波与 Otsu 自动阈值：</p>
+<p class="math">$$y(p)=\underset{q\in \mathcal N(p)}{\operatorname{median}}\; I(q)$$</p>
+<p class="math">$$\sigma_B^2(t)=\omega_0\,\omega_1\,(\mu_0-\mu_1)^2,\qquad t^{*}=\arg\max_{t}\,\sigma_B^2(t)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$\mathcal N(p)$</td><td>以 $p$ 为中心的邻域窗口</td></tr>
+    <tr><td>$t,\,t^{*}$</td><td>分割阈值，以及使类间方差最大的最优阈值</td></tr>
+    <tr><td>$\omega_0,\omega_1$</td><td>被阈值分开的暗、亮两类像素所占比例</td></tr>
+    <tr><td>$\mu_0,\mu_1$</td><td>暗、亮两类的平均灰度</td></tr>
+    <tr><td>$\sigma_B^2$</td><td>类间方差，衡量两类分离程度</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>中值对孤立的极暗或极亮噪点不敏感，因此在去除椒盐噪声时能保持边缘；Otsu 的思想是寻找一个阈值，使暗、亮两类分得越开越好（类间方差最大），从而无需人工设定阈值即可自动分割出局部暗点候选。</div>
+
+<div class="alert warn">
+  <div class="alert-title">Warning · 原理边界</div>
+  灰度变换无法区分一处暗点究竟是痘印、雀斑、阴影还是正常纹理，因此检测出的暗点只是「候选」，实际效果需要人工确认，不能仅凭算法断定已消除痘印。
+</div>
+<p>实测的皮肤局部方差下降率约为 <strong>26%</strong>（落在 20%–40% 的合理区间），五官边缘保护指数约为 <strong>0.999</strong>，说明平滑作用于皮肤而五官梯度几乎未变。</p>
+
+<h2 id="segmentation">4. 图像分割与人脸区域</h2>
+<h3>概念定义</h3>
+<p>肤色检测本质上是像素级的二分类问题。常用做法是：先用颜色阈值得到肤色候选，再用<strong>图割（Graph Cut / GrabCut）</strong>在人脸框内把前景（皮肤）与背景分开，最后用<strong>形态学</strong>运算和小区域过滤清理结果。人脸与眼睛的检测框提供了「哪里是脸」的先验，从而排除眉毛、眼睛、嘴唇等不应被误当作皮肤的区域。</p>
+
+<h3>数学公式与变量解释</h3>
+<p>肤色颜色阈值（只约束色度，不限制亮度）：</p>
+<p class="math">$$133 \le \mathrm{Cr} \le 173,\qquad 77 \le \mathrm{Cb} \le 127$$</p>
+<div class="meaning"><strong>物理意义：</strong>人类肤色在 YCrCb 空间中聚集在特定的色度范围内，且不同光照主要改变亮度 $Y$ 而较少改变色度，因此用 Cr、Cb 区间即可把肤色像素从背景中粗筛出来，且对明暗变化相对稳定。</div>
+
+<p>图割的能量最小化（GrabCut 采用高斯混合模型描述颜色分布）：</p>
+<p class="math">$$E = \sum_{i} D_i \;+\; \lambda \sum_{(i,j)\in \mathcal{C}} \left| \ln p_i - \ln p_j \right|$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$D_i$</td><td>数据项：像素 $i$ 属于前景/背景的代价，由颜色模型（GMM）给出</td></tr>
+    <tr><td>$\lambda$</td><td>平滑项系数，权衡「颜色证据」与「邻域一致性」</td></tr>
+    <tr><td>$\mathcal{C}$</td><td>相邻像素对的集合</td></tr>
+    <tr><td>$p_i,\,p_j$</td><td>相邻像素的颜色模型概率</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>第一项要求每个像素的颜色符合前景或背景模型（数据保真），第二项要求相邻像素尽量同类（空间平滑）。最小化这个能量，就是在「颜色像不像皮肤」和「邻域是否连续」之间取得平衡，从而得到边缘整齐、内部连贯的皮肤区域。</div>
+
+<p>形态学开、闭运算（$A$ 为二值图，$B$ 为结构元素）：</p>
+<p class="math">$$A\circ B = (A\ominus B)\oplus B,\qquad A\bull B = (A\oplus B)\ominus B$$</p>
+<div class="meaning"><strong>物理意义：</strong>开运算（先腐蚀后膨胀）能去掉孤立小亮点而不明显改变大区域；闭运算（先膨胀后腐蚀）能填补小孔洞。二者组合可清理分割结果中的零散噪声与细小空洞，让皮肤掩码更干净。</div>
+
+<p>实测固定样本上，分割的交并比约为 <strong>0.753</strong>、召回率约为 <strong>0.904</strong>，说明大部分真实皮肤区域都被正确检出。</p>
+<figure><img src="assets/skin_mask_panel.png" alt="不同场景下的皮肤区域标注与五官保护示意"><figcaption>图 3　不同光照与遮挡场景下的皮肤区域与五官保护示意</figcaption></figure>
+
+<hr>
+<p style="font-size:13px;color:var(--muted)"><a class="totop" href="#top">回到顶部 ↑</a>上半部分讲解色彩空间、图像增强、滤波去噪与图像分割；下半部分继续讲解掩膜融合、几何自适应、锐化与频域增强、色彩调整、图像复原与质量评价。</p>
+
+<h2 id="blending">5. 图像融合与掩膜</h2>
+<h3>概念定义</h3>
+<p>直接使用二值掩码替换像素会在边界产生明显接缝。实际处理中通常引入 <strong>Alpha 混合</strong>：用连续变化的权重在「处理后图像」与「原图」之间插值，使边界平滑过渡，这一过程称为<strong>羽化</strong>。权重可由像素到区域边界的距离决定。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$I_{\text{out}}(p) = \alpha(p)\,I_{\text{cand}}(p) + \bigl[1-\alpha(p)\bigr]\,I_{\text{orig}}(p)$$</p>
+<p class="math">$$D(p)=\min_{b\in \partial M}\lVert p-b\rVert,\qquad \alpha(p)=\operatorname{clip}\!\left(\frac{D(p)}{r},0,1\right),\qquad \alpha_s=\alpha^2(3-2\alpha)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$I_{\text{cand}},\,I_{\text{orig}},\,I_{\text{out}}$</td><td>处理后的候选图像、原始图像与混合输出</td></tr>
+    <tr><td>$\alpha(p)$</td><td>像素 $p$ 处采用处理结果的权重，取值 $0\sim1$</td></tr>
+    <tr><td>$D(p)$</td><td>像素到区域边界 $\partial M$ 的最短距离（距离变换）</td></tr>
+    <tr><td>$r$</td><td>羽化半径，决定过渡带宽度</td></tr>
+    <tr><td>$\alpha_s$</td><td>经 smoothstep 函数平滑后的权重</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>$\alpha$ 越接近 1 表示越靠近区域内部、完全采用处理结果；越靠近边界 $\alpha$ 越小，逐渐过渡回原图，于是二值边界被「抹平」成连续渐变，消除了亮度或颜色的接缝。smoothstep 让权重在两端变化更缓、中间过渡更顺，视觉上更自然；窄羽化用于小孔洞、宽羽化用于外轮廓，可避免小缺口被错误放大。</div>
+<p>效果上，由于处理权重随距离平滑衰减，人脸边缘与头发、背景交界处不会出现生硬的色块或亮斑，图 2 中蒙版区域与输出的对应关系直观体现了这一点。</p>
+
+<h2 id="geometry">6. 几何变换与区域自适应</h2>
+<h3>概念定义</h3>
+<p>仿射变换是最常见的几何变换，包含缩放、旋转、平移和剪切，其特点是保持直线与平行关系。<strong>区域自适应</strong>则把归一化的模板坐标映射到实际检测到的人脸框，使处理区域能随人脸的位置和大小自动调整，而不是固定在图像某一处。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$\begin{bmatrix}x'\\ y'\\ 1\end{bmatrix} = \begin{bmatrix}a & b & t_x\\ c & d & t_y\\ 0 & 0 & 1\end{bmatrix}\begin{bmatrix}x\\ y\\ 1\end{bmatrix}$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$(x,y),\,(x',y')$</td><td>变换前后的像素坐标</td></tr>
+    <tr><td>$a,b,c,d$</td><td>线性部分，控制缩放、旋转与剪切</td></tr>
+    <tr><td>$t_x,\,t_y$</td><td>水平与垂直方向的平移量</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>矩阵左上角的 $2\times2$ 部分决定图像如何被拉伸和旋转，最后一列决定整体平移。用齐次坐标（补 1）可以把平移也写成矩阵乘法，便于把多个变换串联成一次运算。</div>
+
+<p>区域自适应的坐标映射：</p>
+<p class="math">$$x = x_0 + u\,w,\qquad y = y_0 + v\,h,\qquad u,v\in[0,1]$$</p>
+<div class="meaning"><strong>物理意义：</strong>$(x_0,y_0)$ 是人脸框左上角，$w,h$ 是框的宽和高；$(u,v)$ 是相对框的归一化坐标（例如 $u=0.5$ 表示框的水平中心）。该式把「相对模板位置」翻译成「图像中的绝对位置」，因此当人脸移动或变大变小时，处理域会随框一起移动和缩放。</div>
+<p>效果上，这种自适应使分割与保护区域能贴合不同姿态、不同大小的人脸（见图 3），避免固定模板裁切偏位人像。</p>
+
+<h2 id="sharpening">7. 图像锐化与频域增强</h2>
+<h3>概念定义</h3>
+<p><strong>USM（非锐化掩膜）</strong>是经典的锐化方法：先从原图减去模糊版本得到「细节残差」，再按一定强度加回原图。从频率域看，图像可分解为代表整体明暗的<strong>低频</strong>与代表细节边缘的<strong>高频</strong>；通过调整两者比例，就能在磨皮之后回注细节，避免皮肤显得塑料感。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$I_{\text{sharp}} = I + k\,(I - I_{\text{blur}})$$</p>
+<p class="math">$$H(f_x,f_y)=\exp\!\left[-2\pi^2\sigma^2(f_x^2+f_y^2)\right],\qquad \text{low}=\mathcal{F}^{-1}\{\mathcal{F}(Y)\cdot H\},\qquad \text{high}=Y-\text{low}$$</p>
+<p class="math">$$Y_{\text{out}} = g_l\cdot \text{low} + g_h\cdot \text{high}$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$I,\,I_{\text{blur}},\,I_{\text{sharp}}$</td><td>原图、模糊图与锐化结果</td></tr>
+    <tr><td>$k$</td><td>锐化强度，控制加回多少细节</td></tr>
+    <tr><td>$f_x,\,f_y$</td><td>水平与垂直方向的频率（周期/像素）</td></tr>
+    <tr><td>$\sigma$</td><td>高斯低通的空间尺度（像素），越大截止频率越低</td></tr>
+    <tr><td>$H(f_x,f_y)$</td><td>低通传递函数；$H(0,0)=1$ 保证直流（平均亮度）不变</td></tr>
+    <tr><td>$\mathcal{F},\,\mathcal{F}^{-1}$</td><td>傅里叶变换及其逆变换</td></tr>
+    <tr><td>$g_l,\,g_h$</td><td>低频与高频的增益，决定保留多少基础明暗与细节</td></tr>
+    <tr><td>$\text{low},\,\text{high}$</td><td>低频分量与高频分量，两者相加恰好重构原亮度 $Y$</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>传递函数 $H$ 随频率升高而指数衰减，相当于只让低频通过；于是「原图减去低频」就得到高频细节。由于 $\text{low}+\text{high}=Y$，当 $g_l=g_h=1$ 时输出与原图相同；增大 $g_h$ 就增强细节（锐化），减小 $g_h$ 就抑制细节（磨皮）。$H(0,0)=1$ 保证整体平均亮度不被改变。</div>
+<div class="alert note">
+  <div class="alert-title">Note · 增益的取舍</div>
+  高频增益过大（例如 1.1）会反向放大纹理、抵消磨皮效果；实测中增益取 0.8 左右时，皮肤高频保留率约 0.84，落在 $0.70\sim1.30$ 的合理区间，且与平滑组合后磨皮与细节达到较好平衡。
+</div>
+<p>最终输出（见图 1、图 2）即为平滑与高频回注叠加的结果，既平滑了皮肤又保留了必要的纹理与五官轮廓。</p>
+
+<h2 id="color">8. 色彩与美白调整</h2>
+<h3>概念定义</h3>
+<p><strong>白平衡</strong>的目的是校正光源色偏，使白色物体在成像后仍接近白色。灰度世界法假设场景平均颜色为灰色；<strong>Shades of Gray</strong> 方法进一步假设各通道的 $p$ 次幂均值相等，对复杂光照更稳健。饱和度描述颜色的鲜艳程度，可在 HSV 空间中单独调整；色温参数则用于微调画面的冷暖倾向。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$S_c=\left(\frac{1}{N}\sum_{i=1}^{N} I_{c,i}^{\,p}\right)^{1/p},\qquad g_c=\frac{t}{S_c},\qquad t=\sqrt[3]{S_R\,S_G\,S_B}$$</p>
+<p class="math">$$g'_c = 1 + s\,(g_c-1),\qquad g_R\leftarrow g_R(1-0.15\,T),\quad g_B\leftarrow g_B(1+0.15\,T),\qquad S_{\text{out}}=\operatorname{clip}(S\cdot k_s,0,255)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$c\in\{R,G,B\}$</td><td>颜色通道索引</td></tr>
+    <tr><td>$I_{c,i}$</td><td>第 $i$ 个像素在通道 $c$ 的归一化亮度</td></tr>
+    <tr><td>$p$</td><td>幂指数，控制统计量对高亮像素的敏感程度</td></tr>
+    <tr><td>$S_c$</td><td>通道 $c$ 的颜色统计量</td></tr>
+    <tr><td>$g_c,\,t$</td><td>通道增益与目标灰色值（三通道统计量的几何平均）</td></tr>
+    <tr><td>$s$</td><td>白平衡强度，$s=1$ 为完全校正，$s=0$ 为不校正</td></tr>
+    <tr><td>$T$</td><td>色温，正值偏暖、负值偏冷，取值 $-1\sim1$</td></tr>
+    <tr><td>$S,\,k_s,\,S_{\text{out}}$</td><td>原饱和度、饱和度增益与调整后饱和度</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>该方法假设「世界平均是灰色」，因此把三个通道各自乘上增益 $g_c=t/S_c$，把它们拉到共同的目标灰 $t$，即可消除光源色偏。强度系数 $s$ 用于折中：对皮肤使用较小的 $s$ 可以保留其天然暖色，避免被中性化成发白的「假白」；色温项则人为地给红、蓝通道施加反向微调以控制冷暖；饱和度增益让肤色更有血色。</div>
+<p>效果上，亮度、曝光与白平衡分别作用于不同环节，但都围绕「让肤色自然、背景不失真」的目标；偏色校正的效果可用感知色差指标 $\Delta E_{2000}$ 衡量。</p>
+
+<h2 id="restoration">9. 图像复原：维纳反卷积</h2>
+<h3>概念定义</h3>
+<p>图像复原是图像退化的逆过程。运动模糊可用<strong>点扩散函数（PSF）</strong>建模：清晰图像与 PSF 卷积，再叠加噪声，得到模糊图像。<strong>维纳滤波</strong>在频域进行反卷积，并引入正则项抑制直接逆滤波在弱频率处对噪声的剧烈放大，是图像复原的经典方法。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$g = h * f + n \quad\Longrightarrow\quad G(u,v)=H(u,v)\,F(u,v)+N(u,v)$$</p>
+<p class="math">$$\hat F(u,v) = \frac{H^{*}(u,v)}{\left|H(u,v)\right|^2 + K}\,G(u,v)$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$f,\,g$</td><td>清晰图像与观测到的退化（模糊）图像</td></tr>
+    <tr><td>$h$</td><td>点扩散函数（PSF），描述运动模糊的核；$*$ 表示卷积</td></tr>
+    <tr><td>$n$</td><td>加性噪声</td></tr>
+    <tr><td>$F,\,G,\,H,\,N$</td><td>上述各量在频域的表示，$H$ 又称光传递函数（OTF）</td></tr>
+    <tr><td>$H^{*}$</td><td>$H$ 的复共轭</td></tr>
+    <tr><td>$K$</td><td>维纳正则项，与噪声水平相关</td></tr>
+    <tr><td>$\hat F$</td><td>对清晰图像频谱的估计</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>若 $K\to0$，式子退化为直接逆滤波 $\hat F=G/H$，在 $H$ 接近零的频率处会把噪声放大到无法接受；$K$ 越大，对这类频率的抑制越强，但复原也越保守、细节恢复越少。维纳滤波通过 $K$ 在「去模糊」与「抑噪声」之间取得折中。PSF 的长度与角度决定了模糊的方向和程度，因此复原时需要合理估计这些参数。</div>
+<p>复原效果通常用峰值信噪比与结构相似度的提升量来衡量；本知识点作为课程「图像复原」章节的完整示例列出。</p>
+
+<h2 id="evaluation">10. 图像质量评价</h2>
+<h3>概念定义</h3>
+<p>图像质量评价分为<strong>客观指标</strong>与<strong>主观评价</strong>。客观指标用数学公式衡量分割精度、平滑程度、细节保留与保真度；主观评价则由观察者对自然度、细节、肤色等打分。二者结合才能较全面地判断处理效果。</p>
+
+<h3>数学公式与变量解释</h3>
+<p class="math">$$\mathrm{IoU}=\frac{|A\cap B|}{|A\cup B|},\qquad \mathrm{Recall}=\frac{|A\cap B|}{|GT|}$$</p>
+<p class="math">$$\mathrm{MSE}=\frac{1}{N}\sum_{i}\bigl(I_i-\hat I_i\bigr)^2,\qquad \mathrm{PSNR}=10\log_{10}\!\left(\frac{255^2}{\mathrm{MSE}}\right)$$</p>
+<p class="math">$$\mathrm{var\_drop}=\frac{\sigma^2_{\text{before}}-\sigma^2_{\text{after}}}{\sigma^2_{\text{before}}},\qquad \mathrm{epi}=\frac{\sum \min(g_{\text{before}},g_{\text{after}})}{\sum \max(g_{\text{before}},g_{\text{after}})}$$</p>
+<table>
+  <thead><tr><th>符号</th><th>含义</th></tr></thead>
+  <tbody>
+    <tr><td>$A,\,B$</td><td>预测区域与真实标注区域；$GT$ 为真实标注</td></tr>
+    <tr><td>$I_i,\,\hat I_i$</td><td>原图与参考图的第 $i$ 个像素；$N$ 为像素总数</td></tr>
+    <tr><td>$\mathrm{MSE}$</td><td>均方误差，衡量两图像素差异</td></tr>
+    <tr><td>$\sigma^2_{\text{before}},\,\sigma^2_{\text{after}}$</td><td>处理前后皮肤区域的局部亮度方差</td></tr>
+    <tr><td>$g_{\text{before}},\,g_{\text{after}}$</td><td>处理前后五官区域的梯度幅值（如 Sobel 梯度）</td></tr>
+  </tbody>
+</table>
+<div class="meaning"><strong>物理意义：</strong>IoU 与 Recall 衡量分割结果与真实区域的重合程度，越接近 1 越准确；PSNR 用对数形式表示峰值信号与噪声的比例，值越高失真越小；方差下降率反映皮肤纹理被平滑的程度；EPI 用处理前后梯度的较小值与较大值之比衡量边缘保持情况，越接近 1 表示五官边缘越未被破坏。此外，$\Delta E_{2000}$ 是接近人眼感知的色差指标，用于衡量颜色偏差。</div>
+<p>实测的分割 IoU 约 0.753、Recall 约 0.904，平滑的方差下降率约 26% 且五官保护指数约 0.999，高频保留率约 1.07，各项指标均在合理区间内。</p>
+
+<h2 id="references">11. 参考资料</h2>
+<ol>
+  <li>Rafael C. Gonzalez, Richard E. Woods. <em>Digital Image Processing</em>, 4th ed. Pearson, 2018. ISBN 978-0133356724.（色彩空间、直方图处理、空间/频率域滤波、图像复原的经典教材）</li>
+  <li>Rafael C. Gonzalez, Richard E. Woods, Steven L. Eddins. <em>Digital Image Processing Using MATLAB</em>, 3rd ed. Gatesmark Publishing, 2020. ISBN 978-0982082040.</li>
+  <li>Karel Zuiderveld. "Contrast Limited Adaptive Histogram Equalization." In: <em>Graphics Gems IV</em>, Academic Press, 1994, pp. 474–485.（CLAHE 原始文献）</li>
+  <li>G. Sharma, W. Wu, E. N. Dalal. "The CIEDE2000 Color-Difference Formula: Implementation Notes, Supplementary Test Data, and Mathematical Observations." <em>Color Research &amp; Application</em>, 30(1):21–30, 2005. DOI: 10.1002/col.20070.（色差指标 $\Delta E_{2000}$ 的来源）</li>
+  <li>W. K. Pratt. <em>Digital Image Processing</em>, 4th ed. Wiley, 2007. ISBN 978-0471750991.（维纳滤波与图像复原）</li>
+  <li>OpenCV 官方文档 — OpenCV 4.10.0 Modules（色彩空间转换、CLAHE、双边滤波、图割等算法的 API 说明）。</li>
+</ol>
+
+<div class="alert warn">
+  <div class="alert-title">Note · 本作业未涉及的知识点</div>
+  小波变换、图像压缩编码、多维 Otsu 分割、形态学梯度与顶帽运算等属于课程常见内容，但不在本作业的知识范围内，本页不作展开。
+</div>
+
+<div class="alert important">
+  <div class="alert-title">Important · 溯源与诚信说明</div>
+  本页所有公式与变量定义均依据数字图像处理的通用教材与标准算法；文中效果指标来自项目实测，可用评测脚本复现。未实测或未涉及的内容已明确标注，不含虚构引用与数字。
+</div>
+
+<footer class="page-footer">
+  BeautyCam · 《数字图像处理》课程设计知识点解答 · GitHub Primer 单文件风格 · 生成日期 2026-11-26。<br>
+  本页为对外提交的课程设计作业说明文档，聚焦知识原理；效果数值以实际运行为准。
+</footer>
+
+</main>
+</div>
+
+</body>
+</html>
