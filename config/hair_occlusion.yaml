@@ -1,0 +1,35 @@
+# -*- coding: utf-8 -*-
+# 头发遮挡抑制实验工具参数（A 维护，非 M1-M7 核心模块）。
+# 用途：tools/hair_occlusion.py / tools/hair_test_app.py。
+# 对齐 docs/baseline/arch.md 7.1：可调阈值外置，代码中仅保留代码默认值作为
+# 兜底层；覆盖优先级 代码默认值 < 本文件 < 本次 UI 显式覆盖。
+#
+# 合规边界：本工具不引入任何新模型或新依赖。眼线分区所需的人脸/眼睛定位复用
+# M1（skin_detect）已基线化的 Haar 级联能力；该能力的例外授权见
+# report/lht_haar_20261031.md（用户 2026-10-31 批准）。
+
+enabled: true
+# strength 留空表示使用下方绝对阈值；UI 滑块会把 0..1 的强度作为本次运行覆盖。
+strength:
+
+# 结构张量方向性纹理判据（与颜色无关）。
+coherence_min: 0.70       # 方向相干性阈值：皮肤~0.55，发丝~0.86
+mag_factor: 1.8           # 梯度幅值阈值 = 该倍数 * 掩码内幅值中值
+mag_min: 3.0              # 幅值下限，防止整体偏暗的图误伤
+orientation_min: 0.25     # >0 偏向纵向发丝；保护横向眉/唇
+
+# 形态与噪声过滤。
+boundary_erode: 5         # 掩码腐蚀半径，保护下颌/脸颊轮廓
+min_area_ratio: 0.0003    # 连通域最小面积占整图比例（细发丝取较小值）
+dilate_kernel: 3
+smooth_sigma: 1.0
+tensor_sigma: 3.0
+
+# 无眼线时的兜底：脸部中心矩形保护（保护鼻/法令纹/嘴）。
+protect_center: true
+protect_half_x: 0.30      # x 相对 bbox 中心 ±0.30
+protect_top_y: 0.40       # y 相对 bbox 顶部 0.40 以下开始保护
+protect_bottom_y: 0.92
+
+# 眼线几何分区：仅眼线以上剔除发丝，eye_keep_ratio 放宽眼线附近剔除带。
+eye_keep_ratio: 1.02
