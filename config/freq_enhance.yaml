@@ -4,8 +4,11 @@
 
 # 低通/高通分离；sigma 为空间等效高斯标准差（像素）
 lowpass_sigma: 3.0
-# 当前轻量细节回注为1.1；完整40张复测及限制见 report/b_modules.md。
-highpass_gain: 1.1
+# 高频回注 0.75：模块隔离高频保留约 0.80，位于 PRD 0.70~1.30 基线内；
+# 配合 M3 strength=0.7，端到端皮肤方差下降约 48%，约为旧默认(s0.6/hp1.1)的 1.8 倍。
+# 这是不越过 PRD 双基线的最大磨皮力度；再强需走 change-request。
+# 完整 40 张复测及限制见 report/b_modules.md。
+highpass_gain: 0.75
 lowpass_gain: 1.0
 
 # 诊断可视化

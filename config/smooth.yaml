@@ -3,7 +3,9 @@
 # 验收基线：皮肤局部方差下降率 20%–40%；五官 GT 区 EPI ≥ 0.80。
 
 # 保边滤波
-strength: 0.5
+# 强度 0.7：模块隔离方差下降约 37%，位于 PRD 20%~40% 内且接近上限；
+# 配合 M4 highpass_gain=0.75，端到端磨皮约为旧默认值(s0.6/hp1.1)的 1.8 倍。
+strength: 0.7
 bilateral_d: 9
 sigma_color: 75
 sigma_space: 75
