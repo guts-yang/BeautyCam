@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 580" width="1280" height="580" font-family="system-ui, -apple-system, sans-serif">
+  <rect width="1280" height="580" fill="#ffffff"/>
+  <defs>
+    <marker id="arrow-default" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#555555"/>
+    </marker>
+    <marker id="arrow-c0" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#2563EB"/>
+    </marker>
+    <marker id="arrow-c1" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#10B981"/>
+    </marker>
+    <marker id="arrow-c2" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#7C3AED"/>
+    </marker>
+    <marker id="arrow-c3" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#EA580C"/>
+    </marker>
+    <marker id="arrow-c4" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#C62828"/>
+    </marker>
+    <marker id="arrow-c5" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#0D47A1"/>
+    </marker>
+    <marker id="arrow-c6" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#1B5E20"/>
+    </marker>
+    <marker id="arrow-c7" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#4A148C"/>
+    </marker>
+    <marker id="arrow-c8" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#BF360C"/>
+    </marker>
+    <marker id="arrow-c9" markerWidth="10" markerHeight="10" refX="8" refY="4" orient="auto" markerUnits="strokeWidth">
+      <polygon points="0 0, 8 4, 0 8" fill="#37474F"/>
+    </marker>
+  </defs>
+  <rect x="170.0" y="230.0" width="945.0" height="240.0" fill="#f6f8fa" stroke="#d0d7de" stroke-width="1" rx="8"/>
+  <text x="178.0" y="246.0" font-size="12" fill="#999999" font-weight="bold">核心处理流水线</text>
+  <path d="M 155.0,300.0 L 200.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 360.0,300.0 L 395.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 545.0,300.0 L 575.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 725.0,300.0 L 755.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 905.0,300.0 L 935.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 1085.0,300.0 L 1130.0,300.0" stroke="#24292f" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 862.7,340.0 Q 855.9,379.0 895.5,380.0" stroke="#8c959f" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <path d="M 944.5,380.0 Q 984.1,379.0 977.3,340.0" stroke="#8c959f" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <path d="M 354.0,340.0 Q 450.7,426.4 576.0,460.0" stroke="#8c959f" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <rect x="431.9" y="395.2" width="52.0" height="16" fill="#FFFFFF" rx="3" opacity="0.85"/>
+  <text x="457.9" y="407.2" font-size="11" fill="#777777" text-anchor="middle">皮肤掩码</text>
+  <path d="M 1130.0,318.9 Q 919.4,366.3 730.0,469.8" stroke="#8c959f" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <rect x="904.2" y="362.3" width="41.0" height="16" fill="#FFFFFF" rx="3" opacity="0.85"/>
+  <text x="924.7" y="374.3" font-size="11" fill="#777777" text-anchor="middle">结果图</text>
+  <path d="M 520.0,500.0 L 570.0,500.0" stroke="#57606a" stroke-width="2" fill="none" marker-end="url(#arrow-default)"/>
+  <path d="M 184.4,165.0 Q 126.1,201.6 118.8,270.0" stroke="#57606a" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <path d="M 319.4,165.0 Q 218.3,192.0 148.8,270.0" stroke="#57606a" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <path d="M 650.0,165.0 L 650.0,260.0" stroke="#57606a" stroke-width="2" fill="none" marker-end="url(#arrow-default)" stroke-dasharray="8,4"/>
+  <rect x="624.0" y="194.5" width="52.0" height="16" fill="#FFFFFF" rx="3" opacity="0.85"/>
+  <text x="650.0" y="206.5" font-size="11" fill="#777777" text-anchor="middle">参数注入</text>
+  <rect x="45.0" y="270.0" width="110.0" height="60.0" fill="#ffffff" stroke="#d0d7de" stroke-width="2" rx="0"/>
+  <text x="100.0" y="296.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">人像照片</text>
+  <text x="100.0" y="312.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">(BGR uint8)</text>
+  <rect x="200.0" y="260.0" width="160.0" height="80.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="8"/>
+  <text x="280.0" y="280.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M1 肤色检测</text>
+  <text x="280.0" y="296.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">YCrCb阈值/Haar定位</text>
+  <text x="280.0" y="312.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">GrabCut/五官保护</text>
+  <text x="280.0" y="328.9" font-size="11" fill="#888888" text-anchor="middle">输出皮肤掩码</text>
+  <rect x="395.0" y="260.0" width="150.0" height="80.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="8"/>
+  <text x="470.0" y="288.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M2 曝光改善</text>
+  <text x="470.0" y="304.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">CLAHE/自适应伽马</text>
+  <text x="470.0" y="320.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">过曝保护</text>
+  <rect x="575.0" y="260.0" width="150.0" height="80.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="8"/>
+  <text x="650.0" y="288.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M3 保边平滑</text>
+  <text x="650.0" y="304.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">双边滤波/暗点修补</text>
+  <text x="650.0" y="320.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">边界羽化</text>
+  <rect x="755.0" y="260.0" width="150.0" height="80.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="8"/>
+  <text x="830.0" y="288.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M4 频域增强</text>
+  <text x="830.0" y="304.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">FFT高低频分离</text>
+  <text x="830.0" y="320.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">细节回注</text>
+  <rect x="935.0" y="260.0" width="150.0" height="80.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="8"/>
+  <text x="1010.0" y="288.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M6 色彩调整</text>
+  <text x="1010.0" y="304.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">Shades of Gray</text>
+  <text x="1010.0" y="320.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">HSV饱和度</text>
+  <rect x="1130.0" y="270.0" width="100.0" height="60.0" fill="#ffffff" stroke="#d0d7de" stroke-width="2" rx="0"/>
+  <text x="1180.0" y="304.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">美颜结果图</text>
+  <rect x="845.0" y="380.0" width="150.0" height="60.0" fill="#ffffff" stroke="#8c959f" stroke-width="2" rx="8"/>
+  <text x="920.0" y="406.9" font-size="14" fill="#57606a" text-anchor="middle" font-weight="bold">M5 运动模糊复原</text>
+  <text x="920.0" y="422.9" font-size="14" fill="#57606a" text-anchor="middle" font-weight="bold">(默认关闭)</text>
+  <rect x="570.0" y="460.0" width="160.0" height="80.0" fill="#f3f4f6" stroke="#8c959f" stroke-width="2" rx="8"/>
+  <text x="650.0" y="480.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">M7 质量评价</text>
+  <text x="650.0" y="496.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">IoU/Recall/ΔE2000</text>
+  <text x="650.0" y="512.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">PSNR/SSIM/EPI</text>
+  <text x="650.0" y="528.9" font-size="11" fill="#888888" text-anchor="middle">不参与主处理</text>
+  <rect x="380.0" y="475.0" width="140.0" height="50.0" fill="#ffffff" stroke="#d0d7de" stroke-width="2" rx="0"/>
+  <text x="450.0" y="504.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">皮肤 GT / 参考图</text>
+  <rect x="135.0" y="115.0" width="130.0" height="50.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="0"/>
+  <text x="200.0" y="136.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">命令行 CLI</text>
+  <text x="200.0" y="152.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">(src/main.py)</text>
+  <rect x="290.0" y="115.0" width="140.0" height="50.0" fill="#ffffff" stroke="#0969da" stroke-width="2" rx="0"/>
+  <text x="360.0" y="136.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">Web UI</text>
+  <text x="360.0" y="152.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">(Streamlit app.py)</text>
+  <rect x="580.0" y="115.0" width="140.0" height="50.0" fill="#ffffff" stroke="#d0d7de" stroke-width="2" rx="0"/>
+  <text x="650.0" y="136.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">参数配置</text>
+  <text x="650.0" y="152.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">(config/*.yaml)</text>
+  <rect x="1010.0" y="115.0" width="140.0" height="50.0" fill="#ffffff" stroke="#d0d7de" stroke-width="2" rx="0"/>
+  <text x="1080.0" y="136.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">解答网页</text>
+  <text x="1080.0" y="152.9" font-size="14" fill="#24292f" text-anchor="middle" font-weight="bold">(docs/index.html)</text>
+  <text x="640.0" y="40.0" font-size="22" fill="#24292f" text-anchor="middle">BeautyCam · 人脸美颜相机系统架构（《数字图像处理》课程设计）</text>
+  <text x="640.0" y="70.0" font-size="14" fill="#57606a" text-anchor="middle">技术栈：Python 3.10+ · OpenCV · NumPy · 全程传统图像处理方法，无深度学习</text>
+</svg>
