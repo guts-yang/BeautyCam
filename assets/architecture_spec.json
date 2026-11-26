@@ -1,0 +1,98 @@
+{
+  "title": "BeautyCam Architecture",
+  "canvas": {"width": 1280, "height": 580},
+  "style": {
+    "font_family": "system-ui, -apple-system, sans-serif",
+    "font_size": 14,
+    "bg_color": "#ffffff"
+  },
+  "labels": [
+    {
+      "text": "BeautyCam · 人脸美颜相机系统架构（《数字图像处理》课程设计）",
+      "x": 640, "y": 40,
+      "font_size": 22,
+      "color": "#24292f",
+      "anchor": "middle"
+    },
+    {
+      "text": "技术栈：Python 3.10+ · OpenCV · NumPy · 全程传统图像处理方法，无深度学习",
+      "x": 640, "y": 70,
+      "font_size": 14,
+      "color": "#57606a",
+      "anchor": "middle"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "input_img", "label": "人像照片\n(BGR uint8)", "x": 100, "y": 300, "width": 110, "height": 60, "shape": "rect", "fill": "#ffffff", "stroke": "#d0d7de", "text_color": "#24292f"
+    },
+    {
+      "id": "m1", "label": "M1 肤色检测\nYCrCb阈值/Haar定位\nGrabCut/五官保护", "sublabel": "输出皮肤掩码", "x": 280, "y": 300, "width": 160, "height": 80, "shape": "rounded", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "m2", "label": "M2 曝光改善\nCLAHE/自适应伽马\n过曝保护", "x": 470, "y": 300, "width": 150, "height": 80, "shape": "rounded", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "m3", "label": "M3 保边平滑\n双边滤波/暗点修补\n边界羽化", "x": 650, "y": 300, "width": 150, "height": 80, "shape": "rounded", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "m4", "label": "M4 频域增强\nFFT高低频分离\n细节回注", "x": 830, "y": 300, "width": 150, "height": 80, "shape": "rounded", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "m6", "label": "M6 色彩调整\nShades of Gray\nHSV饱和度", "x": 1010, "y": 300, "width": 150, "height": 80, "shape": "rounded", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "output_img", "label": "美颜结果图", "x": 1180, "y": 300, "width": 100, "height": 60, "shape": "rect", "fill": "#ffffff", "stroke": "#d0d7de", "text_color": "#24292f"
+    },
+    {
+      "id": "m5", "label": "M5 运动模糊复原\n(默认关闭)", "x": 920, "y": 410, "width": 150, "height": 60, "shape": "rounded", "fill": "#ffffff", "stroke": "#8c959f", "text_color": "#57606a"
+    },
+    {
+      "id": "m7", "label": "M7 质量评价\nIoU/Recall/ΔE2000\nPSNR/SSIM/EPI", "sublabel": "不参与主处理", "x": 650, "y": 500, "width": 160, "height": 80, "shape": "rounded", "fill": "#f3f4f6", "stroke": "#8c959f", "text_color": "#24292f"
+    },
+    {
+      "id": "m7_in", "label": "皮肤 GT / 参考图", "x": 450, "y": 500, "width": 140, "height": 50, "shape": "rect", "fill": "#ffffff", "stroke": "#d0d7de", "text_color": "#24292f"
+    },
+    {
+      "id": "cli", "label": "命令行 CLI\n(src/main.py)", "x": 200, "y": 140, "width": 130, "height": 50, "shape": "rect", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "web", "label": "Web UI\n(Streamlit app.py)", "x": 360, "y": 140, "width": 140, "height": 50, "shape": "rect", "fill": "#ffffff", "stroke": "#0969da", "text_color": "#24292f"
+    },
+    {
+      "id": "config", "label": "参数配置\n(config/*.yaml)", "x": 650, "y": 140, "width": 140, "height": 50, "shape": "rect", "fill": "#ffffff", "stroke": "#d0d7de", "text_color": "#24292f"
+    },
+    {
+      "id": "docs", "label": "解答网页\n(docs/index.html)", "x": 1080, "y": 140, "width": 140, "height": 50, "shape": "rect", "fill": "#ffffff", "stroke": "#d0d7de", "text_color": "#24292f"
+    }
+  ],
+  "groups": [
+    {
+      "id": "pipeline_group",
+      "label": "核心处理流水线",
+      "node_ids": ["m1", "m2", "m3", "m4", "m6", "m5"],
+      "fill": "#f6f8fa",
+      "stroke": "#d0d7de",
+      "padding": 30
+    }
+  ],
+  "edges": [
+    {"from": "input_img", "to": "m1", "style": "solid", "color": "#24292f"},
+    {"from": "m1", "to": "m2", "style": "solid", "color": "#24292f"},
+    {"from": "m2", "to": "m3", "style": "solid", "color": "#24292f"},
+    {"from": "m3", "to": "m4", "style": "solid", "color": "#24292f"},
+    {"from": "m4", "to": "m6", "style": "solid", "color": "#24292f"},
+    {"from": "m6", "to": "output_img", "style": "solid", "color": "#24292f"},
+    
+    {"from": "m4", "to": "m5", "style": "dashed", "color": "#8c959f", "curve": true},
+    {"from": "m5", "to": "m6", "style": "dashed", "color": "#8c959f", "curve": true},
+    
+    {"from": "m1", "to": "m7", "style": "dashed", "color": "#8c959f", "curve": true, "label": "皮肤掩码"},
+    {"from": "output_img", "to": "m7", "style": "dashed", "color": "#8c959f", "curve": true, "label": "结果图"},
+    {"from": "m7_in", "to": "m7", "style": "solid", "color": "#57606a"},
+    
+    {"from": "cli", "to": "input_img", "style": "dashed", "color": "#57606a", "curve": true},
+    {"from": "web", "to": "input_img", "style": "dashed", "color": "#57606a", "curve": true},
+    {"from": "config", "to": "m3", "style": "dashed", "color": "#57606a", "label": "参数注入"}
+  ]
+}

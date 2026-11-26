@@ -1,7 +1,7 @@
 # 焕颜相机 BeautyCam —— 人脸美颜相机（数字图像处理课程设计）
 
 <p align="center">
-  <img src="assets/canvas.png" alt="BeautyCam 项目总览" width="100%">
+<div align="center">  <img src="assets/architecture.svg" alt="BeautyCam 项目总览" width="100%"></div>
 </p>
 
 [![课程设计](https://img.shields.io/badge/课程设计-数字图像处理-blue)](#)
