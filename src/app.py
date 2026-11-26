@@ -145,10 +145,15 @@ def main() -> None:
         st.markdown('<p class="bc-panel-title">美颜参数</p>', unsafe_allow_html=True)
         smooth_strength = st.slider("磨皮强度", 0.0, 1.0, 0.5, 0.05,
                                     disabled=(uploaded is None))
-        exposure_gain = st.slider("曝光改善", 0.0, 1.0, 0.3, 0.05,
-                                  disabled=(uploaded is None))
+        exposure_gain = st.slider("曝光改善", 0.0, 1.0, 0.25, 0.05,
+                                  disabled=(uploaded is None),
+                                  help="值越大皮肤提亮越多；过高会让肤色发白，建议默认值。")
         color_temp = st.slider("色温调整", -1.0, 1.0, 0.0, 0.1,
                                disabled=(uploaded is None))
+        skin_warmth = st.slider(
+            "皮肤暖度", 0.0, 1.0, 0.3, 0.05, disabled=(uploaded is None),
+            help="越高皮肤保留越多暖色血色、越少被白平衡拉向中性灰；"
+                 "降低可减轻假白/发灰，1.0 为完全白平衡。")
         st.divider()
         st.markdown('<p class="bc-cap">调节任意参数，中央画布实时更新处理结果。</p>',
                     unsafe_allow_html=True)
@@ -181,7 +186,7 @@ def main() -> None:
                 st.error("无法解码该文件，请确认是有效的 JPG/JPEG/PNG/BMP 图片。")
             return
 
-        params = (smooth_strength, exposure_gain, color_temp)
+        params = (smooth_strength, exposure_gain, color_temp, skin_warmth)
         file_key = getattr(uploaded, "file_id", None) or (uploaded.name, uploaded.size)
         cache_key = (file_key, params)
         cached = st.session_state.get("bc_result")
@@ -190,7 +195,9 @@ def main() -> None:
             module_cfgs = {k: dict(v) for k, v in module_cfgs.items()}
             module_cfgs["smooth"] = {**module_cfgs["smooth"], "strength": smooth_strength}
             module_cfgs["exposure"] = {**module_cfgs["exposure"], "gain": exposure_gain}
-            module_cfgs["color"] = {**module_cfgs["color"], "temperature": color_temp}
+            module_cfgs["color"] = {**module_cfgs["color"],
+                                    "temperature": color_temp,
+                                    "skin_balance_strength": skin_warmth}
             with st.spinner("正在美颜处理…"):
                 result = run_pipeline(image, pipeline_cfg, module_cfgs, mode="preview")
             st.session_state["bc_result"] = {"key": cache_key, "result": result}

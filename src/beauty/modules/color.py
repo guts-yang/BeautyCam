@@ -7,7 +7,10 @@
 约束：只依赖 mask 格式契约，不 import M1；不原地修改输入；掩码为空时安全跳过。
 
 白平衡增益由全图有效像素估计，处理结果再按皮肤掩码限定作用域，避免把皮肤
-本身的暖色均值误当作光源色偏。
+本身的暖色均值误当作光源色偏。肤色区域可使用独立的（通常更弱的）白平衡强度
+skin_balance_strength：整套中性化增益会把本就偏暖的皮肤拉向灰色，造成"假白/
+发灰"；降低该值可让皮肤保留更多原始暖色，非皮肤区域仍按 balance_strength
+正常白平衡。未配置时回退到 balance_strength，保持既有行为不变。
 """
 
 from __future__ import annotations
@@ -88,6 +91,10 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
     temperature = float(cfg.get("temperature", 0.0))
     saturation_gain = float(cfg.get("saturation_gain", 1.05))
     balance_strength = float(cfg.get("balance_strength", 1.0))
+    skin_strength_value = cfg.get("skin_balance_strength")
+    # 未配置（None）时回退到 balance_strength，保持既有行为。
+    skin_balance_strength = (balance_strength if skin_strength_value is None
+                             else float(skin_strength_value))
     low = float(cfg.get("valid_luma_min", 5.0))
     high = float(cfg.get("valid_luma_max", 250.0))
     percentile = float(cfg.get("max_rgb_percentile", 95.0))
@@ -96,14 +103,16 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
     gain_max = float(cfg.get("gain_max", 2.0))
     skin_only = cfg.get("skin_only", True)
 
-    values = (temperature, saturation_gain, balance_strength, low, high,
-              percentile, shade_power, gain_min, gain_max)
+    values = (temperature, saturation_gain, balance_strength, skin_balance_strength,
+              low, high, percentile, shade_power, gain_min, gain_max)
     if not all(np.isfinite(value) for value in values):
         raise ValueError("color 数值配置必须为有限数")
     if not isinstance(skin_only, bool):
         raise ValueError("color.skin_only 必须是布尔值")
     if not (0.0 <= balance_strength <= 1.0):
         raise ValueError("color.balance_strength 必须在 [0, 1]")
+    if not (0.0 <= skin_balance_strength <= 1.0):
+        raise ValueError("color.skin_balance_strength 必须在 [0, 1]")
     if saturation_gain < 0.0:
         raise ValueError("color.saturation_gain 必须 >= 0")
     if not (0.0 <= low < high <= 255.0):
@@ -121,14 +130,18 @@ def process(image_bgr: np.ndarray, skin_mask: np.ndarray,
     gains *= np.array([1.0 - 0.15 * temperature, 1.0,
                        1.0 + 0.15 * temperature], dtype=np.float32)
     gains = np.clip(gains, gain_min, gain_max)
-    gains = 1.0 + balance_strength * (gains - 1.0)
-
-    corrected = image_bgr.astype(np.float32) * gains.reshape(1, 1, 3)
-    corrected = _enhance_saturation(corrected, saturation_gain)
-    corrected_u8 = np.clip(np.rint(corrected), 0, 255).astype(np.uint8)
+    # 同一套光源增益，皮肤用更弱强度以保留暖色，非皮肤按原强度正常白平衡。
+    global_gains = 1.0 + balance_strength * (gains - 1.0)
+    skin_gains = 1.0 + skin_balance_strength * (gains - 1.0)
 
     if not skin_only:
-        return corrected_u8
+        corrected = image_bgr.astype(np.float32) * global_gains.reshape(1, 1, 3)
+        corrected = _enhance_saturation(corrected, saturation_gain)
+        return np.clip(np.rint(corrected), 0, 255).astype(np.uint8)
+
+    corrected = image_bgr.astype(np.float32) * skin_gains.reshape(1, 1, 3)
+    corrected = _enhance_saturation(corrected, saturation_gain)
+    corrected_u8 = np.clip(np.rint(corrected), 0, 255).astype(np.uint8)
     output = image_bgr.copy()
     selected = skin_mask != 0
     output[selected] = corrected_u8[selected]

@@ -7,6 +7,9 @@ temperature: 0.0
 wb_method: shades_of_gray
 shade_power: 6.0
 balance_strength: 0.6
+# 皮肤区域专用白平衡强度：肤色本为暖色，整套中性化会拉成"假白/发灰"。
+# 降低该值可保留更多暖色；0 表示皮肤不做白平衡校正；留空回退 balance_strength。
+skin_balance_strength: 0.3
 
 # 光源估计时排除近黑/近饱和像素；max_rgb 法使用指定分位数
 valid_luma_min: 5.0
@@ -17,6 +20,6 @@ max_rgb_percentile: 95.0
 gain_min: 0.5
 gain_max: 2.0
 
-# 肤色区限定处理
+# 肤色区限定处理：轻微提饱和补回血色，缓解去色后的苍白感。
 skin_only: true
-saturation_gain: 1.0
+saturation_gain: 1.05
