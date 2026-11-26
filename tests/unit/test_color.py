@@ -55,6 +55,28 @@ def test_color_preserves_contract_and_input():
     assert np.array_equal(image, original)
 
 
+def test_skin_balance_strength_controls_warmth_and_zero_skips_skin():
+    """皮肤专用强度越低，皮肤越保留原始暖色；为 0 时皮肤逐像素保持输入。"""
+    clean, mask = _fixture()
+    rgb_gains = (1.25, 0.90, 0.75)
+    cast = np.clip(np.rint(clean.astype(np.float32) * np.array(rgb_gains[::-1], np.float32)),
+                   0, 255).astype(np.uint8)
+    base = {"wb_method": "gray_world", "skin_only": True, "saturation_gain": 1.0,
+            "balance_strength": 1.0, "gain_min": 0.5, "gain_max": 2.0}
+    full = process(cast, mask, {**base, "skin_balance_strength": 1.0})
+    weak = process(cast, mask, {**base, "skin_balance_strength": 0.0})
+    # 0 强度时皮肤区逐像素等于输入，不引入假白。
+    np.testing.assert_array_equal(weak[mask != 0], cast[mask != 0])
+    # 低强度比全强度更接近原始偏暖的 cast（B-R 差值更大）。
+    def warmth(img):
+        sel = img[mask != 0].astype(np.float32)
+        return float(np.mean(sel[:, 2] - sel[:, 0]))
+    assert warmth(weak) > warmth(full)
+    # 未配置时回退到 balance_strength，与 1.0 行为一致（向后兼容）。
+    fallback = process(cast, mask, {**base, "skin_balance_strength": None})
+    np.testing.assert_array_equal(fallback, full)
+
+
 @pytest.mark.parametrize("mask", [None, np.zeros((96, 96), dtype=np.uint8)])
 def test_color_missing_or_empty_mask_safely_skips(mask):
     image, _ = _fixture()
@@ -66,6 +88,8 @@ def test_color_missing_or_empty_mask_safely_skips(mask):
 @pytest.mark.parametrize("cfg", [
     {"wb_method": "unknown"},
     {"balance_strength": 1.1},
+    {"skin_balance_strength": 1.1},
+    {"skin_balance_strength": -0.1},
     {"saturation_gain": -1.0},
     {"shade_power": 0.0},
     {"valid_luma_min": 250, "valid_luma_max": 5},

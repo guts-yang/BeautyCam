@@ -1,22 +1,26 @@
 # -*- coding: utf-8 -*-
 """app.py —— Streamlit 薄入口（A 独占）。
 
-桌面修图软件式布局：左侧工具箱 / 中央预览画布 / 右侧参数面板。
-参数调节即实时重算预览（结果以 file_id + 参数组合缓存，避免重复处理）。
+桌面三栏（工具 / 画布 / 参数），窄屏（iPhone 14 Pro 393×852pt）自动改为单列。
+参数调节即实时重算预览（结果以图片内容哈希 + 参数组合缓存）。
 
 只调用 core 层。约束（对齐 arch 第 6 节、design 2.5）：
 - 上传原图仅在本地进程内存处理，不自动持久化，须用户显式导出；
 - UI 覆盖只作用于当前 run，不回写 YAML；
 - 无 GT 时不显示参考型客观质量分数。
+界面文案面向最终用户，不展示内部算法/指标术语。
 """
 
 from __future__ import annotations
 
+import base64
+import hashlib
 import io
 
 import cv2
 import numpy as np
 import streamlit as st
+from streamlit.components.v1 import html as st_component_html
 
 from beauty.core.config import load_module_config, load_pipeline_config
 from beauty.core.pipeline import run_pipeline
@@ -24,19 +28,9 @@ from beauty.core.pipeline import run_pipeline
 _MODULES = ["skin_detect", "exposure", "smooth", "freq_enhance", "restore", "color", "metrics"]
 _MAX_UPLOAD_MB = 20
 
-_STAGE_LABELS = {
-    "restore": "运动模糊复原",
-    "skin_detect": "肤色检测",
-    "exposure": "曝光改善",
-    "smooth": "磨皮平滑",
-    "freq_enhance": "频域增强",
-    "color": "色彩调整",
-    "metrics": "质量指标",
-}
-
 
 def _decode(uploaded) -> np.ndarray | None:
-    data = np.frombuffer(uploaded.read(), dtype=np.uint8)
+    data = np.frombuffer(uploaded.getvalue(), dtype=np.uint8)
     return cv2.imdecode(data, cv2.IMREAD_COLOR)
 
 
@@ -76,17 +70,7 @@ def _inject_css() -> None:
 .bc-panel-title{font-size:20px;line-height:28px;font-weight:600;color:var(--bc-text-primary);margin:0 0 4px;}
 .bc-tool-title{font-size:16px;line-height:24px;font-weight:500;color:var(--bc-text-primary);margin:0 0 8px;}
 .bc-cap{font-size:12px;line-height:18px;font-weight:400;color:var(--bc-text-secondary);margin:0;}
-.bc-img-label{font-size:16px;line-height:24px;font-weight:500;color:var(--bc-text-primary);
-  text-align:center;margin:0 0 8px;}
-.bc-step{display:flex;align-items:center;justify-content:space-between;gap:8px;
-  font-size:14px;line-height:22px;font-weight:400;color:var(--bc-text-primary);padding:2px 0;}
-.bc-badge{display:inline-block;padding:1px 8px;border-radius:6px;font-size:12px;line-height:18px;
-  font-weight:600;white-space:nowrap;}
-.bc-badge-ok{background:var(--bc-success);color:#FFFFFF;}
-.bc-badge-skip{background:var(--bc-bg-surface);color:var(--bc-text-secondary);
-  border:1px solid var(--bc-border-strong);}
-.bc-badge-fail{background:var(--bc-danger);color:#FFFFFF;}
-.bc-empty{padding:40px 24px;text-align:center;border:1px dashed var(--bc-border-strong);
+.bc-empty{padding:40px 16px;text-align:center;border:1px dashed var(--bc-border-strong);
   border-radius:10px;background:var(--bc-bg-surface);}
 .bc-empty p{font-size:16px;line-height:24px;font-weight:500;color:var(--bc-text-primary);margin:0 0 6px;}
 .bc-empty span{font-size:14px;line-height:22px;font-weight:400;color:var(--bc-text-secondary);}
@@ -97,19 +81,114 @@ def _inject_css() -> None:
   border-color:var(--bc-border-strong);}
 [data-testid="stButton"] button[kind="primary"]:hover{background-color:var(--bc-accent-hover);}
 [data-testid="stButton"] button[kind="primary"]:active{background-color:var(--bc-accent-active);}
+[data-testid="stDownloadButton"] button{
+  background-color:var(--bc-accent);color:var(--bc-text-on-accent);
+  border-color:var(--bc-border-strong);}
+
+/* 窄屏（iPhone 14 Pro 393×852pt）：三栏改单列，顺序为 上传 → 参数 → 结果 */
+@media (max-width: 768px){
+  [data-testid="stHorizontalBlock"]{
+    flex-direction:column !important; flex-wrap:nowrap !important; gap:0.5rem !important;
+  }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]{
+    width:100% !important; flex:1 1 100% !important; min-width:0 !important;
+  }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(1){ order:1; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(2){ order:3; }
+  [data-testid="stHorizontalBlock"] > [data-testid="stColumn"]:nth-child(3){ order:2; }
+  .bc-brand{ gap:8px; padding-bottom:12px; margin-bottom:10px; }
+  .bc-brand h1{ font-size:20px; line-height:28px; }
+  .bc-logo{ width:38px; height:38px; flex-basis:38px; font-size:20px; border-radius:8px; }
+  .block-container{ padding-top:1rem; padding-left:0.8rem !important; padding-right:0.8rem !important; }
+}
 </style>
 """,
         unsafe_allow_html=True,
     )
 
 
-def _status_badge(status) -> str:
-    value = getattr(status, "value", str(status))
-    if value == "ok":
-        return '<span class="bc-badge bc-badge-ok">完成</span>'
-    if value == "skipped":
-        return '<span class="bc-badge bc-badge-skip">跳过</span>'
-    return '<span class="bc-badge bc-badge-fail">失败</span>'
+def _compare_view(original_bgr: np.ndarray, result_bgr: np.ndarray) -> None:
+    """默认按原比例展示结果图；长按按钮或图片显示原图，松手返回结果图。
+
+    纯前端 pointer/touch/keyboard 事件切换，不触发 Streamlit 重算。
+    两张图以绝对定位完全重叠，任一时刻仅一张可见，杜绝图片片段露出；
+    iframe 高度按图片真实宽高比计算，任何比例都完整显示、不裁剪。
+    """
+    def _data_uri(bgr: np.ndarray) -> str:
+        ok, buf = cv2.imencode(".png", bgr)
+        if not ok:
+            return ""
+        return "data:image/png;base64," + base64.b64encode(buf.tobytes()).decode("ascii")
+
+    orig_uri = _data_uri(original_bgr)
+    result_uri = _data_uri(result_bgr)
+    height, width = result_bgr.shape[:2]
+    display_width = 420
+    image_height = display_width * height / width
+    frame_height = int(image_height + 100)
+    component = f"""
+<style>
+.hc-wrap{{font-family:system-ui,-apple-system,"PingFang SC",sans-serif;}}
+.hc-btn{{
+  display:block;width:100%;margin:0 0 10px;padding:12px 16px;font-size:16px;font-weight:600;
+  color:#2B2622;background:#E8A598;border:1px solid #8A8178;border-radius:6px;
+  cursor:pointer;user-select:none;touch-action:none;-webkit-user-select:none;
+}}
+.hc-btn:active,.hc-btn.hc-pressed{{background:#C57A6C;}}
+.hc-btn:focus-visible{{outline:3px solid #0B2E59;outline-offset:2px;}}
+.hc-stage{{
+  position:relative;width:100%;max-width:420px;margin:0 auto;
+  cursor:pointer;touch-action:none;user-select:none;-webkit-user-select:none;
+}}
+.hc-stage img{{
+  position:absolute;top:0;left:0;display:block;width:100%;height:auto;max-width:100%;
+  border-radius:10px;pointer-events:none;
+}}
+.hc-stage{{height:auto;}}
+.hc-stage::before{{
+  content:"";display:block;width:100%;padding-top:{image_height / display_width * 100:.4f}%;
+}}
+.hc-orig{{visibility:hidden;}}
+.hc-wrap.hc-show-orig .hc-orig{{visibility:visible;}}
+.hc-wrap.hc-show-orig .hc-result{{visibility:hidden;}}
+.hc-tip{{font-size:12px;color:#6B6259;margin:8px 0 0;text-align:center;}}
+</style>
+<div class="hc-wrap" id="hc_root">
+  <button type="button" class="hc-btn" id="hc_btn"
+          aria-label="长按查看原图，松开查看美颜结果">长按看原图 · 松开看效果</button>
+  <div class="hc-stage" id="hc_stage" role="button" tabindex="0"
+       aria-label="长按查看原图，松手返回美颜效果">
+    <img class="hc-result" src="{result_uri}" alt="美颜结果">
+    <img class="hc-orig" src="{orig_uri}" alt="原图">
+  </div>
+  <p class="hc-tip">长按按钮或图片看原图，松手返回美颜效果</p>
+</div>
+<script>
+(function(){{
+  var root=document.getElementById('hc_root');
+  var btn=document.getElementById('hc_btn');
+  var stage=document.getElementById('hc_stage');
+  function show(v){{
+    root.classList.toggle('hc-show-orig',v);
+    btn.classList.toggle('hc-pressed',v);
+  }}
+  [btn,stage].forEach(function(el){{
+    ['pointerdown','touchstart'].forEach(function(ev){{
+      el.addEventListener(ev,function(e){{e.preventDefault();show(true);}});
+    }});
+    ['pointerup','pointercancel','pointerleave','touchend','touchcancel','mouseleave','blur'].forEach(function(ev){{
+      el.addEventListener(ev,function(){{show(false);}});
+    }});
+  }});
+  window.addEventListener('pointerup',function(){{show(false);}});
+  btn.addEventListener('keydown',function(e){{if(e.code==='Space'||e.code==='Enter'){{e.preventDefault();show(true);}}}});
+  btn.addEventListener('keyup',function(e){{if(e.code==='Space'||e.code==='Enter'){{show(false);}}}});
+  stage.addEventListener('keydown',function(e){{if(e.code==='Space'||e.code==='Enter'){{e.preventDefault();show(true);}}}});
+  stage.addEventListener('keyup',function(e){{if(e.code==='Space'||e.code==='Enter'){{show(false);}}}});
+}})();
+</script>
+"""
+    st_component_html(component, height=frame_height, scrolling=False)
 
 
 def main() -> None:
@@ -120,7 +199,7 @@ def main() -> None:
         '<div class="bc-brand">'
         '<div class="bc-logo">焕</div>'
         '<div><h1>焕颜相机 BeautyCam</h1>'
-        '<p>人像美颜工作台 · 原图仅在本地内存处理，导出需手动触发</p></div>'
+        '<p>上传照片，轻松美颜，效果实时可见</p></div>'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -128,12 +207,12 @@ def main() -> None:
     col_tool, col_canvas, col_param = st.columns([1.2, 3.0, 1.8], gap="medium")
 
     with col_tool:
-        st.markdown('<p class="bc-tool-title">工具箱</p>', unsafe_allow_html=True)
+        st.markdown('<p class="bc-tool-title">选择照片</p>', unsafe_allow_html=True)
         uploaded = st.file_uploader(
-            "导入人像照片",
+            "上传照片",
             type=["jpg", "jpeg", "png", "bmp"],
             accept_multiple_files=False,
-            help="JPG / JPEG / PNG / BMP，最大 20MB。仅在本机内存处理。",
+            help="支持 JPG / PNG 等常见格式，最大 20MB。",
         )
         if uploaded is not None:
             st.markdown(
@@ -142,56 +221,57 @@ def main() -> None:
             )
 
     with col_param:
-        st.markdown('<p class="bc-panel-title">美颜参数</p>', unsafe_allow_html=True)
-        smooth_strength = st.slider("磨皮强度", 0.0, 1.0, 0.5, 0.05,
-                                    disabled=(uploaded is None))
-        exposure_gain = st.slider("曝光改善", 0.0, 1.0, 0.3, 0.05,
-                                  disabled=(uploaded is None))
-        color_temp = st.slider("色温调整", -1.0, 1.0, 0.0, 0.1,
-                               disabled=(uploaded is None))
+        st.markdown('<p class="bc-panel-title">美颜调节</p>', unsafe_allow_html=True)
+        smooth_strength = st.slider(
+            "磨皮", 0.0, 1.0, 0.7, 0.05, disabled=(uploaded is None),
+            help="数值越大，皮肤越光滑细腻。")
+        exposure_gain = st.slider(
+            "亮度", 0.0, 1.0, 0.25, 0.05, disabled=(uploaded is None),
+            help="数值越大，照片越明亮；建议保持默认，避免过亮。")
+        color_temp = st.slider(
+            "冷暖", -1.0, 1.0, 0.0, 0.1, disabled=(uploaded is None),
+            help="向左偏冷，向右偏暖。")
+        skin_warmth = st.slider(
+            "红润", 0.0, 1.0, 0.3, 0.05, disabled=(uploaded is None),
+            help="数值越大，肤色越红润自然；脸色偏白可调大。")
         st.divider()
-        st.markdown('<p class="bc-cap">调节任意参数，中央画布实时更新处理结果。</p>',
+        st.markdown('<p class="bc-cap">调节后效果实时更新，满意即可保存。</p>',
                     unsafe_allow_html=True)
-
-    with col_canvas:
-        if "bc_cmp" not in st.session_state:
-            st.session_state["bc_cmp"] = "side"
-        _cmp_btns = st.columns(3)
-        for _c, (_label, _key) in zip(_cmp_btns, [
-            ("并排对比", "side"), ("仅原图", "orig"), ("仅结果", "result")
-        ]):
-            with _c:
-                _selected = st.session_state["bc_cmp"] == _key
-                if st.button(_label, key=f"bc_cmp_{_key}",
-                             type="primary" if _selected else "secondary",
-                             use_container_width=True):
-                    st.session_state["bc_cmp"] = _key
-        cmp_mode = st.session_state["bc_cmp"]
 
     result = None
     image = None
     if uploaded is not None:
         if uploaded.size > _MAX_UPLOAD_MB * 1024 * 1024:
             with col_canvas:
-                st.error(f"图片过大（{uploaded.size / 1024 / 1024:.1f}MB），请上传不超过 {_MAX_UPLOAD_MB}MB 的图片。")
+                st.error(f"图片过大（{uploaded.size / 1024 / 1024:.1f}MB），请上传不超过 {_MAX_UPLOAD_MB}MB 的照片。")
             return
         image = _decode(uploaded)
         if image is None:
             with col_canvas:
-                st.error("无法解码该文件，请确认是有效的 JPG/JPEG/PNG/BMP 图片。")
+                st.error("无法识别这张照片，请换一张 JPG / PNG 图片试试。")
             return
 
-        params = (smooth_strength, exposure_gain, color_temp)
-        file_key = getattr(uploaded, "file_id", None) or (uploaded.name, uploaded.size)
+        params = (smooth_strength, exposure_gain, color_temp, skin_warmth)
+        # 以图片内容哈希为签名：换图必重新处理，内容与参数都不变才复用结果。
+        file_key = hashlib.sha256(uploaded.getvalue()).hexdigest()
         cache_key = (file_key, params)
         cached = st.session_state.get("bc_result")
         if cached is None or cached["key"] != cache_key:
             pipeline_cfg, module_cfgs = _load_configs()
             module_cfgs = {k: dict(v) for k, v in module_cfgs.items()}
             module_cfgs["smooth"] = {**module_cfgs["smooth"], "strength": smooth_strength}
+            # 磨皮滑块联动高频回注：0→1.1（细节最全），0.7→0.75（默认，基线内最强），
+            # 1→0.7。低于 0.70 会越 PRD 高频保留下限，故不到 1 时取 0.7 兜底。
+            hp = round(1.1 - 0.5 * smooth_strength, 3)
+            module_cfgs["freq_enhance"] = {
+                **module_cfgs["freq_enhance"],
+                "highpass_gain": max(0.7, hp),
+            }
             module_cfgs["exposure"] = {**module_cfgs["exposure"], "gain": exposure_gain}
-            module_cfgs["color"] = {**module_cfgs["color"], "temperature": color_temp}
-            with st.spinner("正在美颜处理…"):
+            module_cfgs["color"] = {**module_cfgs["color"],
+                                    "temperature": color_temp,
+                                    "skin_balance_strength": skin_warmth}
+            with st.spinner("正在美颜…"):
                 result = run_pipeline(image, pipeline_cfg, module_cfgs, mode="preview")
             st.session_state["bc_result"] = {"key": cache_key, "result": result}
         else:
@@ -200,55 +280,19 @@ def main() -> None:
     with col_canvas:
         if uploaded is None or image is None:
             st.markdown(
-                '<div class="bc-empty"><p>请从左侧工具箱导入一张人像照片</p>'
-                '<span>导入后可调节磨皮、曝光与色温，实时查看美颜效果</span></div>',
+                '<div class="bc-empty"><p>请先上传一张人像照片</p>'
+                '<span>上传后可调节磨皮、亮度、肤色，实时查看效果</span></div>',
                 unsafe_allow_html=True,
             )
         elif result is not None and not result.succeeded:
-            st.error(result.status_text())
+            st.error("处理未成功，请换一张照片再试。")
         elif result is not None and result.final_bgr is not None:
-            original = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-            beautified = cv2.cvtColor(result.final_bgr, cv2.COLOR_BGR2RGB)
-            if cmp_mode == "side":
-                a, b = st.columns(2)
-                with a:
-                    st.markdown('<p class="bc-img-label">原图</p>', unsafe_allow_html=True)
-                    st.image(original, use_column_width=True)
-                with b:
-                    st.markdown('<p class="bc-img-label">处理后</p>', unsafe_allow_html=True)
-                    st.image(beautified, use_column_width=True)
-            elif cmp_mode == "orig":
-                st.markdown('<p class="bc-img-label">原图</p>', unsafe_allow_html=True)
-                st.image(original, use_column_width=True)
-            else:
-                st.markdown('<p class="bc-img-label">处理后</p>', unsafe_allow_html=True)
-                st.image(beautified, use_column_width=True)
-
-    with col_tool:
-        st.divider()
-        st.markdown('<p class="bc-tool-title">处理流程</p>', unsafe_allow_html=True)
-        if result is None:
-            st.markdown('<p class="bc-cap">等待导入图片…</p>', unsafe_allow_html=True)
-        else:
-            for rec in result.stages:
-                st.markdown(
-                    f'<div class="bc-step"><span>{_STAGE_LABELS.get(rec.stage, rec.stage)}</span>'
-                    f'{_status_badge(rec.status)}</div>',
-                    unsafe_allow_html=True,
-                )
-            st.divider()
-            if result.succeeded and result.final_bgr is not None:
-                ok, buf = cv2.imencode(".png", result.final_bgr)
-                if ok:
-                    st.download_button("导出结果图", data=io.BytesIO(buf.tobytes()),
-                                       file_name="beautycam_result.png", mime="image/png",
-                                       use_container_width=True)
-
-    with col_param:
-        if result is not None:
-            st.caption(f"处理状态：{result.status_text()}")
-        st.caption("当前无 GT 参考，IoU / ΔE2000 / PSNR / SSIM 等参考型客观指标不可评估，"
-                   "界面不显示无参考依据的质量分数。")
+            _compare_view(image, result.final_bgr)
+            ok, buf = cv2.imencode(".png", result.final_bgr)
+            if ok:
+                st.download_button("保存美颜照片", data=io.BytesIO(buf.tobytes()),
+                                   file_name="beautycam_result.png", mime="image/png",
+                                   use_container_width=True)
 
 
 if __name__ == "__main__":
